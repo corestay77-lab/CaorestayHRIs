@@ -1,0 +1,28 @@
+{
+  "name": "corestay-people",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "desktop:web": "node desktop/build-web.mjs",
+    "desktop:dev": "npm run desktop:web && electron desktop/main.js",
+    "desktop:dist": "npm run desktop:web && electron-builder --config desktop/builder.json --win"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "next": "^15.5.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "@neondatabase/serverless": "^1.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "eslint": "^9.30.0",
+    "eslint-config-next": "^15.5.0",
+    "typescript": "^5.8.3"
+  }
+}

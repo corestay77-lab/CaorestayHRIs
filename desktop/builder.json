@@ -1,0 +1,2 @@
+{"appId":"id.corestay.people","productName":"CoreStay People","directories":{"output":"dist-desktop"},"files":["desktop/main.js","desktop/icon.png","desktop/web/**/*"],"extraMetadata":{"main":"desktop/main.js"},
+ "win":{"target":[{"target":"nsis","arch":["x64"]},{"target":"portable","arch":["x64"]}],"icon":"desktop/icon.png"},"nsis":{"oneClick":false,"allowToChangeInstallationDirectory":true,"createDesktopShortcut":true}}
