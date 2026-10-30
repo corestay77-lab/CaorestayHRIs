@@ -41,7 +41,7 @@ export default function Absen(){
   const maxAcc=st?.maxAcc||100,accOk=!!pos&&pos.coords.accuracy<=maxAcc;
   const send=async()=>{if(!st||st.kind==='done')return;
     if(!pos){say(locating?'Lokasi masih dicari, tunggu beberapa detik.':'Lokasi belum terbaca. Mencari lokasi lagi…');if(!locating)locate(maxAcc);return}
-    if(!accOk){{const a=Math.round(pos.coords.accuracy);say(a>500?`Sinyal GPS belum terkunci (±${a} m, masih lokasi jaringan). Pastikan Lokasi HP aktif mode akurasi tinggi dan buka halaman ini di Chrome/Safari (bukan dari dalam WhatsApp/aplikasi lain), lalu tunggu 30–60 detik.`:`Akurasi GPS ±${a} m, perlu ≤ ${maxAcc} m. Tunggu beberapa detik sampai akurasi membaik, atau minta HRD menaikkan batas akurasi di Pengaturan.`);return}}
+    if(!accOk){{const a=Math.round(pos.coords.accuracy);say(a>500?`Lokasi masih kasar (±${a} m). Aktifkan Lokasi Presisi — lihat petunjuk kuning di bawah.`:`Akurasi GPS ±${a} m, perlu ≤ ${maxAcc} m. Tunggu beberapa detik sampai akurasi membaik, atau minta HRD menaikkan batas akurasi di Pengaturan.`);return}}
     if(!cam||!vid.current?.videoWidth){say('Kamera belum siap. Mengaktifkan kamera…');await openCam();return}
     setBusy(true);setMsg(null);
     const s=await selfie();if(!s.img){say(s.why!);setBusy(false);return}
@@ -67,6 +67,7 @@ export default function Absen(){
         <div style={{display:'flex',gap:8,marginBottom:10,fontSize:12,flexWrap:'wrap'}}>
           <span className={`badge ${accOk?'ok':'wait'}`}>{pos?`Lokasi ±${Math.round(pos.coords.accuracy)} m${accOk?'':` (perlu ≤ ${maxAcc} m)${locating?` · ${secs} dtk`:''}`}`:locating?`Mencari lokasi… ${secs} dtk`:'Lokasi belum siap'}</span>
           <span className={`badge ${cam?'ok':'wait'}`}>{cam?'Kamera siap':'Kamera belum siap'}</span></div>
+        {pos&&pos.coords.accuracy>500&&secs>=8&&<div role="note" style={{background:'#fff7e0',border:'1px solid #ffd277',borderRadius:12,padding:12,marginBottom:10,fontSize:13,lineHeight:1.5}}><b>Lokasi HP masih kasar (±{Math.round(pos.coords.accuracy)} m).</b> Hampir selalu karena izin lokasi diset &quot;Perkiraan&quot;, bukan &quot;Presisi&quot;.<br/><b>Android:</b> ketuk ikon gembok di alamat → Izin → Lokasi → pilih <b>Presisi</b> (atau Pengaturan → Aplikasi → Chrome → Izin → Lokasi → nyalakan <b>Gunakan lokasi presisi</b>).<br/><b>iPhone:</b> Pengaturan → Privasi → Layanan Lokasi → Situs Web Safari → nyalakan <b>Lokasi Presisi</b>.<br/>Lalu muat ulang halaman ini dan tekan <b>Ulangi lokasi</b>.</div>}
         <button className="button" style={{width:'100%',padding:16,fontSize:17}} disabled={busy} onClick={send}>{busy?'Memproses…':st.kind==='in'?'Absen Masuk':'Absen Pulang'}</button>
         <div style={{display:'flex',gap:8,marginTop:10}}><button className="button secondary" style={{flex:1}} onClick={()=>locate(maxAcc)}>Ulangi lokasi</button><button className="button secondary" style={{flex:1}} onClick={cam?stopCam:openCam}>{cam?'Matikan kamera':'Nyalakan kamera'}</button></div></div>}
       <button className="button secondary" style={{width:'100%'}} onClick={()=>{stopCam();stopGps();setSt(null);setPin('');setPos(null);setMsg(null)}}>Keluar</button></>}
