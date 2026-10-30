@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 // Halaman karyawan: scan QR hotel → ID + PIN → satu tombol Absen.
 // Lokasi (akurasi + radius) dan selfie hanya dipakai untuk validasi. Foto TIDAK disimpan; yang tercatat hanya jam, jarak, dan akurasi.
-type St={name:string;code:string;hotel:string;shift:string;clock_in:string|null;clock_out:string|null;kind:'in'|'out'|'done';maxAcc:number;soft?:boolean};
+type St={name:string;code:string;hotel:string;shift:string;clock_in:string|null;clock_out:string|null;kind:'in'|'out'|'done';maxAcc:number;soft?:boolean;tz:string;tzLabel:string};
 const post=async(b:object)=>{const r=await fetch('/api/absen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});return r.json()};
 export default function Absen(){
   const [code,setCode]=useState(''),[pin,setPin]=useState(''),[st,setSt]=useState<St|null>(null),[msg,setMsg]=useState<{t:string;ok:boolean}|null>(null),[busy,setBusy]=useState(false);
   const [pos,setPos]=useState<GeolocationPosition|null>(null),[locating,setLocating]=useState(false),[cam,setCam]=useState(false);
   const [qr,setQr]=useState(''),[hotel,setHotel]=useState<string|null>(null),[qrErr,setQrErr]=useState('');
-  const [secs,setSecs]=useState(0),tick=useRef<any>(null),tout=useRef<any>(null);
+  const [clock,setClock]=useState(''),[secs,setSecs]=useState(0),tick=useRef<any>(null),tout=useRef<any>(null);
   const vid=useRef<HTMLVideoElement>(null),stream=useRef<MediaStream|null>(null),watch=useRef<number|null>(null);
   const say=(t:string,ok=false)=>setMsg({t,ok});
   const stopCam=()=>{stream.current?.getTracks().forEach(t=>t.stop());stream.current=null;setCam(false)};
@@ -38,6 +38,8 @@ export default function Absen(){
     const mean=s/n,sd=Math.sqrt(Math.max(0,s2/n-mean*mean));if(mean<25||sd<12)return{why:'Foto terlalu gelap atau tertutup. Pastikan wajah terlihat jelas.'};
     const FD=(window as any).FaceDetector;if(FD){try{const f=await new FD({fastMode:true}).detect(c);if(!f.length)return{why:'Wajah tidak terdeteksi. Hadapkan wajah ke kamera.'}}catch{}}
     return{img:c.toDataURL('image/jpeg',.5)}};
+  // jam di lokasi hotel (dari zona waktu hotel, bukan jam HP)
+  useEffect(()=>{if(!st)return;const f=()=>setClock(new Intl.DateTimeFormat('id-ID',{timeZone:st.tz,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date()).replace('.',':'));f();const t=setInterval(f,15000);return()=>clearInterval(t)},[st?.tz]);
   const maxAcc=st?.maxAcc||100,accOk=!!pos&&pos.coords.accuracy<=maxAcc;
   const send=async()=>{if(!st||st.kind==='done')return;
     if(!st.soft){
@@ -48,7 +50,7 @@ export default function Absen(){
     const s=await selfie();if(!s.img){say(s.why!);setBusy(false);return}
     try{const r=await post({op:'clock',code,pin,q:qr,...(pos?{lat:pos.coords.latitude,lng:pos.coords.longitude,acc:pos.coords.accuracy}:{}),selfie:s.img});
       if(!r.ok)say(r.error);else{
-        say(r.kind==='in'?`Absen masuk berhasil pukul ${r.time}${r.lateMin>0?` · terlambat ${r.lateMin} menit`:''}. Tercatat di rekap.${r.warn?` (lokasi ditandai untuk dicek HRD: ${r.warn})`:''}`:`Absen pulang berhasil pukul ${r.time} · ${r.hours} jam kerja${r.ot>0?` · lembur ${r.ot} jam`:''}. Tercatat di rekap.${r.warn?` (lokasi ditandai untuk dicek HRD: ${r.warn})`:''}`,true);
+        say(r.kind==='in'?`Absen masuk berhasil pukul ${r.time} ${r.tzLabel}${r.lateMin>0?` · terlambat ${r.lateMin} menit`:''}. Tercatat di rekap.${r.warn?` (lokasi ditandai untuk dicek HRD: ${r.warn})`:''}`:`Absen pulang berhasil pukul ${r.time} ${r.tzLabel} · ${r.hours} jam kerja${r.ot>0?` · lembur ${r.ot} jam`:''}. Tercatat di rekap.${r.warn?` (lokasi ditandai untuk dicek HRD: ${r.warn})`:''}`,true);
         stopCam();stopGps();setPos(null);const n=await post({op:'status',code,pin,q:qr});if(n.ok)setSt(n)}
     }catch{say('Tidak bisa terhubung ke server.')}setBusy(false)};
   const card:React.CSSProperties={background:'#fff',borderRadius:18,padding:18,boxShadow:'0 10px 30px -12px rgba(18,52,140,.3)',marginBottom:12};
@@ -62,7 +64,7 @@ export default function Absen(){
       <input style={inp} placeholder="PIN" type="password" inputMode="numeric" value={pin} onChange={e=>setPin(e.target.value)} onKeyDown={e=>e.key==='Enter'&&code&&pin&&login()} aria-label="PIN"/>
       <button className="button" style={{width:'100%',padding:14}} disabled={busy||!code||!pin} onClick={login}>{busy?'Memeriksa…':'Lanjut'}</button></div>}
     {st&&<><div style={card}><div style={{fontWeight:800,fontSize:18}}>{st.name}</div><div className="muted">{st.code} · {st.hotel}</div>
-      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}><span className="badge">Shift: {st.shift}</span><span className="badge">Masuk: {st.clock_in||'—'}</span><span className="badge">Pulang: {st.clock_out||'—'}</span></div></div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}><span className="badge">Jam hotel: {clock} {st.tzLabel}</span><span className="badge">Shift: {st.shift}</span><span className="badge">Masuk: {st.clock_in||'—'}</span><span className="badge">Pulang: {st.clock_out||'—'}</span></div></div>
       {st.kind==='done'?<div className="badge ok" style={{display:'block',textAlign:'center',padding:12,marginBottom:12}}>Absensi hari ini selesai ✓</div>
       :<div style={card}><video ref={vid} playsInline muted style={{width:'100%',borderRadius:14,display:cam?'block':'none',transform:'scaleX(-1)',marginBottom:10}}/>
         <div style={{display:'flex',gap:8,marginBottom:10,fontSize:12,flexWrap:'wrap'}}>

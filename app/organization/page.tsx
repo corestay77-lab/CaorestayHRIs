@@ -4,7 +4,8 @@ import Shell from '@/components/Shell';
 import Form from '@/components/Form';
 import HotelQr from '@/components/HotelQr';
 import { useDB, newToken } from '@/lib/store';
-import { Geo } from '@/lib/payroll';
+import { Geo, tzOf } from '@/lib/payroll';
+import { TZS } from '@/lib/geo';
 export default function Org(){
   const {db,update}=useDB();
   const addDept=(v:Record<string,string>)=>{const n=v.n.trim();if(db.depts.includes(n))return;update(d=>({...d,depts:[...d.depts,n]}),`Tambah Departemen: ${n}`)};
@@ -23,9 +24,10 @@ function GeoSection(){
   const num=(h:string,k:'lat'|'lng'|'radius',v:number)=><input type="number" step="any" defaultValue={v||''} key={h+k+v} style={{width:k==='radius'?90:130}} aria-label={`${k} ${h}`} onBlur={e=>{const n=Number(e.target.value)||0;if(n!==v)set(h,{[k]:n},`${k} ${n}`)}}/>;
   const q=db.geo[qrHotel];
   return <><section className="card panel" style={{marginTop:12}}><h2>Lokasi, radius & QR absen per hotel</h2><p className="muted">Karyawan hanya bisa absen bila berada dalam radius titik hotel. Berdiri di lobi lalu klik &quot;Pakai lokasi saya&quot;. QR dicetak dan ditempel di pos security.</p>
-    <div className="table-wrap"><table><thead><tr><th>Hotel</th><th>Latitude</th><th>Longitude</th><th>Radius (m)</th><th>Jam masuk</th><th></th></tr></thead><tbody>
+    <div className="table-wrap"><table><thead><tr><th>Hotel</th><th>Latitude</th><th>Longitude</th><th>Radius (m)</th><th>Jam masuk</th><th>Zona waktu</th><th></th></tr></thead><tbody>
     {db.hotels.map(h=>{const g=db.geo[h]||{lat:0,lng:0,radius:db.settings.radius,shift:db.settings.shift};return <tr key={h}><td>{h}{!(g.lat||g.lng)&&<div className="badge wait">lokasi belum diatur</div>}</td><td>{num(h,'lat',g.lat)}</td><td>{num(h,'lng',g.lng)}</td><td>{num(h,'radius',g.radius)}</td>
       <td><input type="time" defaultValue={g.shift} key={h+g.shift} onBlur={e=>e.target.value!==g.shift&&set(h,{shift:e.target.value},'jam masuk '+e.target.value)}/></td>
+      <td><select value={tzOf(db,h)} aria-label={`Zona waktu ${h}`} onChange={e=>set(h,{tz:e.target.value},'zona waktu '+e.target.value)}>{TZS.map(t=><option key={t[0]} value={t[0]}>{t[1]}</option>)}</select></td>
       <td style={{whiteSpace:'nowrap'}}><button className="button secondary" onClick={()=>here(h)}>Pakai lokasi saya</button> <button className="button" onClick={()=>{if(!g.qr)set(h,{qr:newToken()},'buat kode QR');setQrHotel(h)}}>QR absen</button></td></tr>})}
     {!db.hotels.length&&<tr><td className="muted">Tambahkan hotel dulu.</td></tr>}</tbody></table></div></section>
     {q?.qr&&<HotelQr hotel={qrHotel} token={q.qr} onRegen={()=>set(qrHotel,{qr:newToken()},'ganti kode QR')} onClose={()=>setQrHotel('')}/>}</>}

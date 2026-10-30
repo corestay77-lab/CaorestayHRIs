@@ -4,7 +4,7 @@ import { Users,CalendarCheck,TriangleAlert,Wallet,ChartColumn,PieChart,Clipboard
 import Shell from '@/components/Shell';
 import { useDB } from '@/lib/store';
 import { calc, rp } from '@/lib/payroll';
-import { nowWIB } from '@/lib/geo';
+import { nowIn } from '@/lib/geo';
 const COL=['#1d5bff','#3b9bff','#7b3fe4','#13b8aa','#d9b45a','#ff7a59','#8aa4d6'];
 const monthAdd=(p:string,i:number)=>{const[y,m]=p.split('-').map(Number);return new Date(Date.UTC(y,m-1+i,1)).toISOString().slice(0,7)};
 const mLabel=(p:string)=>new Date(p+'-01T00:00:00Z').toLocaleDateString('id-ID',{month:'short',timeZone:'UTC'});
@@ -13,7 +13,7 @@ const Hero=()=><svg viewBox="0 0 600 180" preserveAspectRatio="xMaxYMax slice" a
   <g stroke="#ffffff" strokeOpacity=".35" strokeWidth="2">{[0,1,2,3,4,5].map(i=><line key={i} x1="356" x2="404" y1={62+i*16} y2={62+i*16}/>)}{[0,1,2,3,4].map(i=><line key={i} x1="476" x2="526" y1={78+i*18} y2={78+i*18}/>)}</g>
   <path d="M0 150 Q150 125 300 150 T600 145 V180 H0Z" fill="#fff" fillOpacity=".12"/><path d="M0 165 Q150 148 300 165 T600 160 V180 H0Z" fill="#fff" fillOpacity=".18"/></svg>;
 export default function Home(){
-  const {db,update,status}=useDB(),today=nowWIB().date,P=db.period;
+  const {db,update,status}=useDB(),today=nowIn(db.settings.tz).date,P=db.period;
   const act=db.emps.filter(e=>e.status==='Aktif');
   const todayAtt=db.att.filter(a=>a.date===today);
   const cnt=(f:(a:typeof todayAtt[0])=>boolean)=>todayAtt.filter(f).length;

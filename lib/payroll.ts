@@ -1,27 +1,29 @@
-import { nowWIB } from './geo';
+import { nowIn, okTz, DEFAULT_TZ } from './geo';
 export type Emp={id:string;code?:string;name:string;hotel:string;dept:string;position:string;joinDate:string;status:'Aktif'|'Nonaktif';basic:number;allowance:number;deduction:number;thrFactor:number;comps?:Record<string,number>};
 // Satu baris absensi. Karyawan yang scan QR tercatat otomatis (src 'qr'); sakit/izin/cuti/koreksi diinput HRD (src 'manual').
 export type Att={id:string;empId:string;date:string;status:'Hadir'|'Sakit'|'Izin'|'Alpa'|'Cuti';otHours:number;src?:'manual'|'qr'|'selfie';in?:string;out?:string;dist?:number;late?:boolean;lateMin?:number;hours?:number;note?:string};
 export type Shift={name:string;start:string;end:string};
 export type Sched={id:string;empId:string;date:string;shift:string};
-export type Geo={lat:number;lng:number;radius:number;shift:string;qr?:string};
+export type Geo={lat:number;lng:number;radius:number;shift:string;qr?:string;tz?:string};
 export type Corr={id:string;entered?:string;empId:string;from:string;period:string;desc:string;amount:number};
 export type User={id:string;name:string;email:string;role:string;active:boolean};
 export type Comp={id:string;name:string;type:'Tunjangan'|'Potongan';amount:number;bpjs:boolean};
-export type Settings={company:string;companyId:string;npwp:string;address:string;phone:string;email:string;empPrefix:string;empDigits:number;empNext:number;radius:number;shift:string;tol:number;maxAcc:number;lateCut:number;geoMode:'strict'|'soft';otDiv:number;otRate1:number;otRate2:number;otMax:number;alpaDiv:number;comps:Comp[];activeUser:string;users:User[]};
+export type Settings={company:string;companyId:string;npwp:string;address:string;phone:string;email:string;empPrefix:string;empDigits:number;empNext:number;radius:number;shift:string;tol:number;maxAcc:number;lateCut:number;geoMode:'strict'|'soft';tz:string;otDiv:number;otRate1:number;otRate2:number;otMax:number;alpaDiv:number;comps:Comp[];activeUser:string;users:User[]};
 export type PStatus='draft'|'submitted'|'approved'|'locked';
 export type DB={hotels:string[];depts:string[];emps:Emp[];att:Att[];corr:Corr[];geo:Record<string,Geo>;shifts:Shift[];sched:Sched[];closed:Record<string,boolean>;budget:Record<string,number>;periods:Record<string,PStatus>;period:string;audit:{t:string;m:string;u?:string}[];snap:Record<string,Record<string,any>>;settings:Settings;lastSync:string|null};
-export const EMPTY:DB={hotels:[],depts:['Front Office','Housekeeping','F&B','Engineering','Sales & Marketing','Finance','HR'],emps:[],att:[],corr:[],geo:{},shifts:[{name:'Pagi',start:'07:00',end:'15:00'},{name:'Siang',start:'15:00',end:'23:00'},{name:'Malam',start:'23:00',end:'07:00'}],sched:[],closed:{},budget:{},periods:{},period:new Date().toISOString().slice(0,7),audit:[],snap:{},settings:{company:'CoreStay Advisory',companyId:'CSA-001',npwp:'',address:'',phone:'',email:'',empPrefix:'EMP',empDigits:4,empNext:1,radius:100,shift:'08:00',tol:0,maxAcc:100,lateCut:0,geoMode:'strict',otDiv:173,otRate1:1.5,otRate2:2,otMax:4,alpaDiv:26,comps:[],activeUser:'USR-001',users:[{id:'USR-001',name:'HR Manager',email:'',role:'Admin',active:true}]},lastSync:null};
+export const EMPTY:DB={hotels:[],depts:['Front Office','Housekeeping','F&B','Engineering','Sales & Marketing','Finance','HR'],emps:[],att:[],corr:[],geo:{},shifts:[{name:'Pagi',start:'07:00',end:'15:00'},{name:'Siang',start:'15:00',end:'23:00'},{name:'Malam',start:'23:00',end:'07:00'}],sched:[],closed:{},budget:{},periods:{},period:new Date().toISOString().slice(0,7),audit:[],snap:{},settings:{company:'CoreStay Advisory',companyId:'CSA-001',npwp:'',address:'',phone:'',email:'',empPrefix:'EMP',empDigits:4,empNext:1,radius:100,shift:'08:00',tol:0,maxAcc:100,lateCut:0,geoMode:'strict',tz:DEFAULT_TZ,otDiv:173,otRate1:1.5,otRate2:2,otMax:4,alpaDiv:26,comps:[],activeUser:'USR-001',users:[{id:'USR-001',name:'HR Manager',email:'',role:'Admin',active:true}]},lastSync:null};
 // Gabungkan data (mis. dari backup versi lama) dengan nilai default agar field baru selalu ada.
 export const normalize=(j:any):DB=>({...EMPTY,...j,settings:{...EMPTY.settings,...(j?.settings||{})}});
 // Tarif BPJS default. Verifikasi dengan regulasi terbaru sebelum dipakai untuk payroll nyata.
 export const RATE={kesEmp:.01,kesEr:.04,jhtEmp:.02,jhtEr:.037,jpEmp:.01,jpEr:.02,jkk:.0024,jkm:.003};
 export const CAP={kes:12_000_000,jp:10_042_300};
+// Zona waktu sebuah hotel: pengaturan hotel → default perusahaan.
+export const tzOf=(db:DB,hotel?:string)=>okTz((hotel&&db.geo[hotel]?.tz)||db.settings.tz);
 export const rp=(n:number)=>'Rp '+Math.round(n).toLocaleString('id-ID');
 // REKAP absensi per karyawan per bulan. Satu-satunya sumber angka absensi untuk halaman Rekap dan Payroll.
 // Alpa = input manual + hari terjadwal yang sudah lewat tanpa absensi (otomatis, hanya bila karyawan memakai jadwal).
 export function recap(empId:string,db:DB,p=db.period){
-  const att=db.att.filter(a=>a.empId===empId&&a.date.startsWith(p)),has=new Set(att.map(a=>a.date)),today=nowWIB().date;
+  const att=db.att.filter(a=>a.empId===empId&&a.date.startsWith(p)),has=new Set(att.map(a=>a.date)),today=nowIn(tzOf(db,db.emps.find(e=>e.id===empId)?.hotel)).date;
   const autoAlpa=db.sched.filter(s=>s.empId===empId&&s.date.startsWith(p)&&s.shift!=='Libur'&&s.date<today&&!has.has(s.date)).length;
   const n=(s:Att['status'])=>att.filter(a=>a.status===s).length,sum=(f:(a:Att)=>number)=>att.reduce((t,a)=>t+f(a),0);
   return {hadir:n('Hadir'),telat:att.filter(a=>a.status==='Hadir'&&(a.lateMin||0)>0).length,lateMin:sum(a=>a.lateMin||0),sakit:n('Sakit'),izin:n('Izin'),cuti:n('Cuti'),alpa:n('Alpa')+autoAlpa,autoAlpa,otHours:sum(a=>a.otHours||0),hours:sum(a=>a.hours||0),belumPulang:att.filter(a=>a.in&&!a.out).length}}

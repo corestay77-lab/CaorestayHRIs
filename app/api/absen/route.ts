@@ -1,7 +1,7 @@
 // Satu-satunya route tanpa login HRD: dipakai karyawan lewat /absen. Semua validasi dilakukan di server.
 import { q, dbConfigured } from '@/lib/db';
 import { verifySecret, json, errMsg } from '@/lib/auth';
-import { distM, nowWIB, addDays, absMin, toMin } from '@/lib/geo';
+import { distM, nowIn, okTz, tzShort, addDays, absMin, toMin } from '@/lib/geo';
 export const dynamic='force-dynamic';
 type Doc={emps:any[];geo:Record<string,any>;sched:any[];shifts:any[];settings:any;periods:Record<string,string>};
 const fail=(error:string,status=200)=>json({ok:false,error},status);
@@ -31,8 +31,8 @@ async function checkPin(d:Doc,code:string,pin:string){
   if(r.fails)await q(`update hr_pin set fails=0, locked_until=null where emp_id=$1`,[e.id]);
   return {e}}
 // Posisi absensi saat ini: baris yang masih terbuka (belum pulang, < 16 jam) → pulang; sudah ada hari ini → selesai; selain itu → masuk.
-async function position(empId:string){
-  const n=nowWIB(),rows=await q(`select id, work_date, clock_in, clock_out from hr_att where emp_id=$1 and src='qr' and work_date>=$2 order by work_date desc, clock_in desc`,[empId,addDays(n.date,-1)]);
+async function position(empId:string,tz:string){
+  const n=nowIn(tz),rows=await q(`select id, work_date, clock_in, clock_out from hr_att where emp_id=$1 and src='qr' and work_date>=$2 order by work_date desc, clock_in desc`,[empId,addDays(n.date,-1)]);
   const open=rows.find((r:any)=>r.clock_in&&!r.clock_out&&absMin(n.date,n.time)-absMin(r.work_date,r.clock_in)<=960);
   const today=rows.find((r:any)=>r.work_date===n.date);
   return {n,open,today,kind:(open?'out':today?'done':'in') as 'in'|'out'|'done'}}
@@ -45,10 +45,10 @@ export async function POST(req:Request){
     const c=await checkPin(d,String(b.code||''),String(b.pin||''));if(!c.e)return fail(c.err!);
     const e=c.e,geo=d.geo[hotel],maxAcc=Number(d.settings.maxAcc)||100;
     if(e.hotel!==hotel)return fail(`Anda terdaftar di ${e.hotel}. Scan QR hotel Anda sendiri.`);
-    const p=await position(e.id);
+    const tz=okTz(geo?.tz||d.settings.tz),tzl=tzShort(tz),p=await position(e.id,tz);
     if(b.op==='status'){
       const sh=shiftOf(d,e.id,p.n.date,geo),row=p.open||p.today;
-      return json({ok:true,name:e.name,code:e.code,hotel,shift:sh.name?`${sh.name} ${sh.start}–${sh.end}`:`mulai ${sh.start}`,clock_in:row?.clock_in||null,clock_out:p.today?.clock_out||null,kind:p.kind,maxAcc,soft:d.settings.geoMode==='soft'})}
+      return json({ok:true,name:e.name,code:e.code,hotel,shift:sh.name?`${sh.name} ${sh.start}–${sh.end}`:`mulai ${sh.start}`,clock_in:row?.clock_in||null,clock_out:p.today?.clock_out||null,kind:p.kind,maxAcc,tz,tzLabel:tzl,soft:d.settings.geoMode==='soft'})}
     if(b.op!=='clock')return fail('Permintaan tidak dikenal');
     if(p.kind==='done')return fail('Absensi hari ini sudah selesai.');
     // — validasi lokasi & selfie —
@@ -65,10 +65,10 @@ export async function POST(req:Request){
     if(p.kind==='in'){
       const sh=shiftOf(d,e.id,p.n.date,geo),late=Math.max(0,toMin(p.n.time)-toMin(sh.start)-(Number(d.settings.tol)||0));
       await q(`insert into hr_att(id,emp_id,work_date,status,clock_in,late_min,dist,acc,src,note) values($1,$2,$3,'Hadir',$4,$5,$6,$7,'qr',$8) on conflict do nothing`,[crypto.randomUUID(),e.id,p.n.date,p.n.time,late,dist,accR,warn?'⚠ '+warn:null]);
-      return json({ok:true,kind:'in',time:p.n.time,lateMin:late,warn})}
+      return json({ok:true,kind:'in',tzLabel:tzl,time:p.n.time,lateMin:late,warn})}
     // pulang: jam kerja & usulan lembur (kelipatan 30 menit setelah jam selesai shift, maks 4 jam) langsung masuk rekap
     const o=p.open!,sh=shiftOf(d,e.id,o.work_date,geo),hours=+((absMin(p.n.date,p.n.time)-absMin(o.work_date,o.clock_in))/60).toFixed(2);
     let end=toMin(sh.end);if(end<=toMin(sh.start))end+=1440;
     const outM=absMin(p.n.date,p.n.time)-absMin(o.work_date,'00:00'),ot=Math.min(d.settings.otMax===undefined?4:Number(d.settings.otMax)||0,Math.floor(Math.max(0,outM-end)/30)/2);
     await q(`update hr_att set clock_out=$2, hours=$3, ot_hours=$4, note=case when $5::text is null then note else coalesce(note||' · ','')||$5::text end where id=$1`,[o.id,p.n.time,hours,ot,warn?'⚠ pulang: '+warn:null]);
-    return json({ok:true,kind:'out',time:p.n.time,hours,ot,warn})}catch(e:any){return fail(errMsg(e),500)}}
+    return json({ok:true,kind:'out',tzLabel:tzl,time:p.n.time,hours,ot,warn})}catch(e:any){return fail(errMsg(e),500)}}

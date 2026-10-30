@@ -5,11 +5,12 @@ import Shell from '@/components/Shell';
 import Form from '@/components/Form';
 import { useDB, uid, attAdd, attSet, attDel } from '@/lib/store';
 import { calc, recap, rp } from '@/lib/payroll';
-import { nowWIB } from '@/lib/geo';
+import { nowIn } from '@/lib/geo';
 const TABS=['Rekap','Harian','Daftar Bulanan'];
 const STAT=['Sakit','Izin','Cuti','Alpa'],code=(n:string)=>n.slice(0,3);
 export default function Attendance(){
-  const {db,update,locked}=useDB();const [tab,setTab]=useState(TABS[0]),[dept,setDept]=useState(''),[hotel,setHotel]=useState(''),[date,setDate]=useState(nowWIB().date),[err,setErr]=useState('');
+  const {db,update,locked}=useDB();const [tab,setTab]=useState(TABS[0]),[dept,setDept]=useState(''),[hotel,setHotel]=useState(''),[dateSel,setDate]=useState(''),[err,setErr]=useState('');
+  const date=dateSel||nowIn(db.settings.tz).date;
   const name=(id:string)=>db.emps.find(e=>e.id===id)?.name||'—';
   const act=db.emps.filter(e=>e.status==='Aktif'&&(!hotel||e.hotel===hotel));
   const R=act.map(e=>({e,r:recap(e.id,db),c:calc(e,db)}));
@@ -32,8 +33,8 @@ export default function Attendance(){
         <td>{r.alpa}{r.autoAlpa>0&&<span className="muted"> ({r.autoAlpa} dari jadwal)</span>}</td><td>{r.otHours}</td><td>{cut>0?<b style={{color:'#c0243f'}}>−{rp(cut)}</b>:<span className="muted">—</span>}{r.belumPulang>0&&<span className="badge wait" style={{marginLeft:6}}>{r.belumPulang} belum pulang</span>}</td></tr>})}
       {R.length?<tr><td><b>Total</b></td><td><b>{T.hadir}</b></td><td><b>{T.telat}×</b></td><td/><td/><td/><td/><td><b>{T.alpa}</b></td><td><b>{T.ot}</b></td><td><b>−{rp(T.cut)}</b></td></tr>:<tr><td colSpan={10} className="muted">Belum ada karyawan aktif.</td></tr>}</tbody></table></div>
       <p className="muted">Potongan = alpa (gaji pokok ÷ 26 per hari) + telat (Rp per menit, diatur di Pengaturan{db.settings.lateCut?`: sekarang ${rp(db.settings.lateCut)}/menit`:' — saat ini Rp 0, belum ada potongan telat'}). Lembur dihitung dari jam pulang setelah jam selesai shift. Alpa otomatis hanya untuk karyawan yang memakai jadwal.</p></section>}
-    {tab==='Harian'&&<><section className="card panel"><div className="toolbar"><h2>Absensi {date}</h2><input type="date" value={date} onChange={e=>setDate(e.target.value)} aria-label="Tanggal"/></div>
-      <div className="table-wrap"><table><thead><tr><th>Karyawan</th><th>Status</th><th>Masuk</th><th>Pulang</th><th>Telat</th><th>Jam</th><th>Jarak</th><th>Lembur (jam)</th><th></th></tr></thead><tbody>
+    {tab==='Harian'&&<><section className="card panel"><div className="toolbar"><h2>Absensi {date} <span className="muted" style={{fontSize:12}}>(jam sesuai zona waktu hotel)</span></h2><input type="date" value={date} onChange={e=>setDate(e.target.value)} aria-label="Tanggal"/></div>
+      <div className="table-wrap"><table><thead><tr><th>Karyawan</th><th>Status</th><th>Masuk</th><th>Pulang</th><th>Telat</th><th>Jam kerja</th><th>Jarak</th><th>Lembur (jam)</th><th></th></tr></thead><tbody>
       {day.map(a=><tr key={a.id}><td>{name(a.empId)}</td><td><span className="badge">{a.status}</span></td><td>{a.in||'—'}</td><td>{a.out||(a.in?<span className="badge wait">belum pulang</span>:'—')}</td><td>{a.lateMin?a.lateMin+' mnt':'—'}</td><td>{a.hours??'—'}</td><td>{a.dist!==undefined?a.dist+' m':'—'}{a.src==='qr'&&a.note&&<span className="badge wait" title={a.note} style={{marginLeft:4}}>⚠ lokasi</span>}</td>
         <td><input type="number" min={0} step={0.5} style={{width:70}} disabled={locked} defaultValue={a.otHours} key={a.id+a.otHours} onBlur={e=>{const n=Number(e.target.value)||0;if(n!==a.otHours)run(()=>attSet(a.id,{otHours:n},`Ubah lembur ${name(a.empId)} ${a.date} → ${n}`))}}/></td>
         <td><button className="button secondary" disabled={locked} onClick={()=>{if(confirm('Hapus absensi ini?'))run(()=>attDel(a.id,`Hapus absensi ${name(a.empId)} ${a.date}`))}}>Hapus</button></td></tr>)}

@@ -7,7 +7,7 @@ import { LayoutDashboard,Building2,ContactRound,CalendarCheck,Wallet,ChartNoAxes
 import { useDB, api, refreshGate } from '@/lib/store';
 import Gate from './Gate';
 import { APP_VERSION } from '@/lib/version';
-import { nowWIB } from '@/lib/geo';
+import { nowIn } from '@/lib/geo';
 // Sidebar diringkas: menu yang saling berkaitan digabung, halaman di dalamnya tampil sebagai tab.
 export const groups=[
   {label:'Dashboard',icon:LayoutDashboard,tabs:[['Dashboard','/']]},
@@ -25,7 +25,7 @@ export default function Shell({title,sub,children}:{title:string;sub?:string;chi
   const ql=q.trim().toLowerCase(),grp=groups.find(g=>g.tabs.some(t=>t[1]===path))||groups[0];
   const hits=ql?[...nav.filter(n=>n[0].toLowerCase().includes(ql)).map(n=>({l:n[0],s:'Menu',h:n[2] as string})),...db.emps.filter(e=>e.name.toLowerCase().includes(ql)).slice(0,5).map(e=>({l:e.name,s:e.dept,h:'/employees'}))].slice(0,8):[];
   const me=db.settings.users.find(u=>u.id===db.settings.activeUser)||db.settings.users[0]||{name:'Pengguna',role:'-'};
-  const today=nowWIB().date,pending=db.att.filter(a=>a.in&&!a.out&&a.date<today).length; // lupa absen pulang
+  const today=nowIn(db.settings.tz).date,pending=db.att.filter(a=>a.in&&!a.out&&a.date<today).length; // lupa absen pulang
   if(gate.state!=='ok')return <Gate g={gate}/>;
   return <><div className="mnav"><img src="/logo-icon.png" alt="CoreStay" width={30} height={30} style={{flex:"0 0 30px"}}/>{groups.map(g=><Link key={g.label} href={g.tabs[0][1]} className={g===grp?'active':''}>{g.label}</Link>)}</div>
   <div className="app"><aside className="sidebar"><Link href="/" className="brandlogo" aria-label="CoreStay Advisory · People"><img src="/logo.png" alt="CoreStay Advisory" width={170} height={150}/></Link><div className="appname">PEOPLE · HR · ATTENDANCE · PAYROLL</div>

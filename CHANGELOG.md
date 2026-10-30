@@ -2,6 +2,10 @@
 
 Aturan: setiap update menaikkan versi di `lib/version.ts` dan `package.json`, lalu dicatat di sini.
 
+## 0.2.1
+- Jam absensi kini mengikuti **zona waktu lokasi hotel** (WIB / WITA / WIT), bukan Jakarta tetap. Zona diatur per hotel (otomatis terisi dari zona waktu perangkat saat mendaftarkan hotel) dengan default perusahaan di Pengaturan. Jam dihitung oleh server, jadi jam HP karyawan tidak berpengaruh.
+- Halaman absen menampilkan jam hotel + zona (mis. 08:03 WITA).
+
 ## 0.2.0
 Gabungan semua perubahan sejak 0.1.0:
 - Absensi disederhanakan: scan QR + ID + PIN → masuk Rekap otomatis → potongan otomatis ke Payroll (tanpa validasi/approval/closing absensi).
