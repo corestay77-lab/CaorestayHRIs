@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 // Halaman karyawan: scan QR hotel → ID + PIN → satu tombol Absen.
 // Lokasi (akurasi + radius) dan selfie hanya dipakai untuk validasi. Foto TIDAK disimpan; yang tercatat hanya jam, jarak, dan akurasi.
-type St={name:string;code:string;hotel:string;shift:string;clock_in:string|null;clock_out:string|null;kind:'in'|'out'|'done';maxAcc:number};
+type St={name:string;code:string;hotel:string;shift:string;clock_in:string|null;clock_out:string|null;kind:'in'|'out'|'done';maxAcc:number;soft?:boolean};
 const post=async(b:object)=>{const r=await fetch('/api/absen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});return r.json()};
 export default function Absen(){
   const [code,setCode]=useState(''),[pin,setPin]=useState(''),[st,setSt]=useState<St|null>(null),[msg,setMsg]=useState<{t:string;ok:boolean}|null>(null),[busy,setBusy]=useState(false);
@@ -40,14 +40,15 @@ export default function Absen(){
     return{img:c.toDataURL('image/jpeg',.5)}};
   const maxAcc=st?.maxAcc||100,accOk=!!pos&&pos.coords.accuracy<=maxAcc;
   const send=async()=>{if(!st||st.kind==='done')return;
-    if(!pos){say(locating?'Lokasi masih dicari, tunggu beberapa detik.':'Lokasi belum terbaca. Mencari lokasi lagi…');if(!locating)locate(maxAcc);return}
-    if(!accOk){{const a=Math.round(pos.coords.accuracy);say(a>500?`Lokasi masih kasar (±${a} m). Aktifkan Lokasi Presisi — lihat petunjuk kuning di bawah.`:`Akurasi GPS ±${a} m, perlu ≤ ${maxAcc} m. Tunggu beberapa detik sampai akurasi membaik, atau minta HRD menaikkan batas akurasi di Pengaturan.`);return}}
+    if(!st.soft){
+      if(!pos){say(locating?'Lokasi masih dicari, tunggu beberapa detik.':'Lokasi belum terbaca. Mencari lokasi lagi…');if(!locating)locate(maxAcc);return}
+      if(!accOk){const a=Math.round(pos.coords.accuracy);say(a>500?`Lokasi masih kasar (±${a} m). Aktifkan Lokasi Presisi — lihat petunjuk kuning di bawah.`:`Akurasi GPS ±${a} m, perlu ≤ ${maxAcc} m. Tunggu beberapa detik sampai akurasi membaik, atau minta HRD menaikkan batas akurasi di Pengaturan.`);return}}
     if(!cam||!vid.current?.videoWidth){say('Kamera belum siap. Mengaktifkan kamera…');await openCam();return}
     setBusy(true);setMsg(null);
     const s=await selfie();if(!s.img){say(s.why!);setBusy(false);return}
-    try{const r=await post({op:'clock',code,pin,q:qr,lat:pos.coords.latitude,lng:pos.coords.longitude,acc:pos.coords.accuracy,selfie:s.img});
+    try{const r=await post({op:'clock',code,pin,q:qr,...(pos?{lat:pos.coords.latitude,lng:pos.coords.longitude,acc:pos.coords.accuracy}:{}),selfie:s.img});
       if(!r.ok)say(r.error);else{
-        say(r.kind==='in'?`Absen masuk berhasil pukul ${r.time}${r.lateMin>0?` · terlambat ${r.lateMin} menit`:''}. Tercatat di rekap.`:`Absen pulang berhasil pukul ${r.time} · ${r.hours} jam kerja${r.ot>0?` · lembur ${r.ot} jam`:''}. Tercatat di rekap.`,true);
+        say(r.kind==='in'?`Absen masuk berhasil pukul ${r.time}${r.lateMin>0?` · terlambat ${r.lateMin} menit`:''}. Tercatat di rekap.${r.warn?` (lokasi ditandai untuk dicek HRD: ${r.warn})`:''}`:`Absen pulang berhasil pukul ${r.time} · ${r.hours} jam kerja${r.ot>0?` · lembur ${r.ot} jam`:''}. Tercatat di rekap.${r.warn?` (lokasi ditandai untuk dicek HRD: ${r.warn})`:''}`,true);
         stopCam();stopGps();setPos(null);const n=await post({op:'status',code,pin,q:qr});if(n.ok)setSt(n)}
     }catch{say('Tidak bisa terhubung ke server.')}setBusy(false)};
   const card:React.CSSProperties={background:'#fff',borderRadius:18,padding:18,boxShadow:'0 10px 30px -12px rgba(18,52,140,.3)',marginBottom:12};

@@ -48,25 +48,27 @@ export async function POST(req:Request){
     const p=await position(e.id);
     if(b.op==='status'){
       const sh=shiftOf(d,e.id,p.n.date,geo),row=p.open||p.today;
-      return json({ok:true,name:e.name,code:e.code,hotel,shift:sh.name?`${sh.name} ${sh.start}–${sh.end}`:`mulai ${sh.start}`,clock_in:row?.clock_in||null,clock_out:p.today?.clock_out||null,kind:p.kind,maxAcc})}
+      return json({ok:true,name:e.name,code:e.code,hotel,shift:sh.name?`${sh.name} ${sh.start}–${sh.end}`:`mulai ${sh.start}`,clock_in:row?.clock_in||null,clock_out:p.today?.clock_out||null,kind:p.kind,maxAcc,soft:d.settings.geoMode==='soft'})}
     if(b.op!=='clock')return fail('Permintaan tidak dikenal');
     if(p.kind==='done')return fail('Absensi hari ini sudah selesai.');
     // — validasi lokasi & selfie —
-    if(!geo||!(geo.lat||geo.lng))return fail('Lokasi hotel belum diatur oleh HRD.');
-    const lat=Number(b.lat),lng=Number(b.lng),acc=Number(b.acc);
-    if(!isFinite(lat)||!isFinite(lng)||!isFinite(acc))return fail('Lokasi tidak terbaca. Aktifkan GPS lalu coba lagi.');
-    if(acc>maxAcc)return fail(`Akurasi GPS ±${Math.round(acc)} m (maks ${maxAcc} m). Pindah ke area terbuka lalu ulangi lokasi.`);
-    const dist=Math.round(distM(lat,lng,geo.lat,geo.lng)),radius=Number(geo.radius)||100;
-    if(dist>radius)return fail(`Anda ${dist} m dari ${hotel} (maks ${radius} m). Absen hanya bisa di area hotel.`);
+    // Mode 'strict' (default): lokasi tidak valid → absen ditolak. Mode 'soft': absen tetap masuk, tetapi diberi tanda ⚠ untuk dicek HRD.
+    const soft=d.settings.geoMode==='soft',hasGeo=!!geo&&!!(geo.lat||geo.lng);let warn='',dist:number|null=null,accR:number|null=null;
+    if(!hasGeo&&!soft)return fail('Lokasi hotel belum diatur oleh HRD.');
+    const lat=Number(b.lat),lng=Number(b.lng),acc=Number(b.acc),radius=Number(geo?.radius)||100;
+    if(!isFinite(lat)||!isFinite(lng)||!isFinite(acc)){if(!soft)return fail('Lokasi tidak terbaca. Aktifkan GPS lalu coba lagi.');warn='Lokasi tidak terbaca'}
+    else{accR=Math.round(acc);if(hasGeo)dist=Math.round(distM(lat,lng,geo.lat,geo.lng));
+      if(acc>maxAcc){if(!soft)return fail(`Akurasi GPS ±${accR} m (maks ${maxAcc} m). Pindah ke area terbuka lalu ulangi lokasi.`);warn=`Akurasi GPS ±${accR} m`}
+      else if(dist!==null&&dist>radius){if(!soft)return fail(`Anda ${dist} m dari ${hotel} (maks ${radius} m). Absen hanya bisa di area hotel.`);warn=`${dist} m dari hotel`}}
     if(!selfieOk(b.selfie))return fail('Selfie dari kamera diperlukan untuk absen.');
     if(d.periods[p.n.date.slice(0,7)]==='locked')return fail('Payroll periode ini sudah dikunci. Hubungi HRD.');
     if(p.kind==='in'){
       const sh=shiftOf(d,e.id,p.n.date,geo),late=Math.max(0,toMin(p.n.time)-toMin(sh.start)-(Number(d.settings.tol)||0));
-      await q(`insert into hr_att(id,emp_id,work_date,status,clock_in,late_min,dist,acc,src) values($1,$2,$3,'Hadir',$4,$5,$6,$7,'qr') on conflict do nothing`,[crypto.randomUUID(),e.id,p.n.date,p.n.time,late,dist,Math.round(acc)]);
-      return json({ok:true,kind:'in',time:p.n.time,lateMin:late})}
+      await q(`insert into hr_att(id,emp_id,work_date,status,clock_in,late_min,dist,acc,src,note) values($1,$2,$3,'Hadir',$4,$5,$6,$7,'qr',$8) on conflict do nothing`,[crypto.randomUUID(),e.id,p.n.date,p.n.time,late,dist,accR,warn?'⚠ '+warn:null]);
+      return json({ok:true,kind:'in',time:p.n.time,lateMin:late,warn})}
     // pulang: jam kerja & usulan lembur (kelipatan 30 menit setelah jam selesai shift, maks 4 jam) langsung masuk rekap
     const o=p.open!,sh=shiftOf(d,e.id,o.work_date,geo),hours=+((absMin(p.n.date,p.n.time)-absMin(o.work_date,o.clock_in))/60).toFixed(2);
     let end=toMin(sh.end);if(end<=toMin(sh.start))end+=1440;
     const outM=absMin(p.n.date,p.n.time)-absMin(o.work_date,'00:00'),ot=Math.min(4,Math.floor(Math.max(0,outM-end)/30)/2);
-    await q(`update hr_att set clock_out=$2, hours=$3, ot_hours=$4 where id=$1`,[o.id,p.n.time,hours,ot]);
-    return json({ok:true,kind:'out',time:p.n.time,hours,ot})}catch(e:any){return fail(errMsg(e),500)}}
+    await q(`update hr_att set clock_out=$2, hours=$3, ot_hours=$4, note=case when $5::text is null then note else coalesce(note||' · ','')||$5::text end where id=$1`,[o.id,p.n.time,hours,ot,warn?'⚠ pulang: '+warn:null]);
+    return json({ok:true,kind:'out',time:p.n.time,hours,ot,warn})}catch(e:any){return fail(errMsg(e),500)}}
