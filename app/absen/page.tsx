@@ -24,7 +24,8 @@ export default function Absen(){
     const t=setTimeout(stopGps,20000);
     watch.current=navigator.geolocation.watchPosition(p=>{setPos(old=>!old||p.coords.accuracy<=old.coords.accuracy?p:old);if(p.coords.accuracy<=max){clearTimeout(t);stopGps()}},
       ()=>{clearTimeout(t);stopGps();say('Lokasi tidak bisa diakses. Izinkan lokasi di browser.')},{enableHighAccuracy:true,timeout:20000,maximumAge:0})};
-  const openCam=async()=>{try{const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}});stream.current=s;setCam(true);if(vid.current){vid.current.srcObject=s;await vid.current.play()}}catch{say('Kamera tidak bisa diakses. Izinkan kamera di browser.')}};
+  const openCam=async()=>{try{if(stream.current)stream.current.getTracks().forEach(t=>t.stop());const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});stream.current=s;setCam(true);return true}catch{setCam(false);say('Kamera tidak bisa diakses. Izinkan kamera di browser (alamat harus https).');return false}};
+  useEffect(()=>{const v=vid.current;if(cam&&v&&stream.current&&v.srcObject!==stream.current){v.srcObject=stream.current;v.play().catch(()=>{})}},[cam,st]);
   const login=async()=>{setBusy(true);setMsg(null);
     try{const r=await post({op:'status',code,pin,q:qr});if(!r.ok){setSt(null);say(r.error)}else{setSt(r);try{localStorage.setItem('cs-emp-code',code.toUpperCase())}catch{}if(r.kind!=='done'){locate(r.maxAcc);openCam()}}}catch{say('Tidak bisa terhubung ke server.')}setBusy(false)};
   // Cek selfie di HP: kamera aktif, gambar tidak gelap/kosong, dan wajah terdeteksi bila browser mendukung. Hasilnya tidak disimpan.
@@ -36,7 +37,11 @@ export default function Absen(){
     const FD=(window as any).FaceDetector;if(FD){try{const f=await new FD({fastMode:true}).detect(c);if(!f.length)return{why:'Wajah tidak terdeteksi. Hadapkan wajah ke kamera.'}}catch{}}
     return{img:c.toDataURL('image/jpeg',.5)}};
   const maxAcc=st?.maxAcc||100,accOk=!!pos&&pos.coords.accuracy<=maxAcc;
-  const send=async()=>{if(!st||st.kind==='done'||!pos)return;setBusy(true);setMsg(null);
+  const send=async()=>{if(!st||st.kind==='done')return;
+    if(!pos){say(locating?'Lokasi masih dicari, tunggu beberapa detik.':'Lokasi belum terbaca. Mencari lokasi lagi…');if(!locating)locate(maxAcc);return}
+    if(!accOk){say(`Akurasi GPS ±${Math.round(pos.coords.accuracy)} m, perlu ≤ ${maxAcc} m. Pindah ke area terbuka (dekat jendela/luar ruangan) lalu tekan Ulangi lokasi.`);return}
+    if(!cam||!vid.current?.videoWidth){say('Kamera belum siap. Mengaktifkan kamera…');await openCam();return}
+    setBusy(true);setMsg(null);
     const s=await selfie();if(!s.img){say(s.why!);setBusy(false);return}
     try{const r=await post({op:'clock',code,pin,q:qr,lat:pos.coords.latitude,lng:pos.coords.longitude,acc:pos.coords.accuracy,selfie:s.img});
       if(!r.ok)say(r.error);else{
@@ -45,8 +50,7 @@ export default function Absen(){
     }catch{say('Tidak bisa terhubung ke server.')}setBusy(false)};
   const card:React.CSSProperties={background:'#fff',borderRadius:18,padding:18,boxShadow:'0 10px 30px -12px rgba(18,52,140,.3)',marginBottom:12};
   const inp:React.CSSProperties={width:'100%',padding:'13px 14px',border:'1px solid #dbe5f8',borderRadius:12,fontSize:16,marginBottom:10};
-  const ready=accOk&&cam;
-  return <main style={{minHeight:'100vh',background:'linear-gradient(180deg,#040d2a,#0a2a7a 220px,#eef3fc 220px)',padding:'18px 14px 40px'}}><div style={{maxWidth:460,margin:'0 auto'}}>
+    return <main style={{minHeight:'100vh',background:'linear-gradient(180deg,#040d2a,#0a2a7a 220px,#eef3fc 220px)',padding:'18px 14px 40px'}}><div style={{maxWidth:460,margin:'0 auto'}}>
     <div style={{textAlign:'center',color:'#fff',marginBottom:18}}><img src="/logo.png" alt="CoreStay Advisory" width={150} style={{height:'auto',display:'block',margin:'0 auto 6px'}}/><div style={{fontSize:12,letterSpacing:2,color:'#9fb4dc'}}>ABSENSI KARYAWAN</div></div>
     {hotel&&<div style={{...card,padding:'12px 16px',borderLeft:'5px solid #13b8aa'}}>📍 Absen di <b>{hotel}</b></div>}
     {qrErr&&!hotel&&<div role="alert" style={{...card,borderLeft:'5px solid #ff9c2f'}}>{qrErr}</div>}
@@ -61,7 +65,7 @@ export default function Absen(){
         <div style={{display:'flex',gap:8,marginBottom:10,fontSize:12,flexWrap:'wrap'}}>
           <span className={`badge ${accOk?'ok':'wait'}`}>{pos?`Lokasi ±${Math.round(pos.coords.accuracy)} m${accOk?'':` (perlu ≤ ${maxAcc} m)`}`:locating?'Mencari lokasi…':'Lokasi belum siap'}</span>
           <span className={`badge ${cam?'ok':'wait'}`}>{cam?'Kamera siap':'Kamera belum siap'}</span></div>
-        <button className="button" style={{width:'100%',padding:16,fontSize:17}} disabled={busy||!ready} onClick={send}>{busy?'Memproses…':st.kind==='in'?'Absen Masuk':'Absen Pulang'}</button>
+        <button className="button" style={{width:'100%',padding:16,fontSize:17}} disabled={busy} onClick={send}>{busy?'Memproses…':st.kind==='in'?'Absen Masuk':'Absen Pulang'}</button>
         <div style={{display:'flex',gap:8,marginTop:10}}><button className="button secondary" style={{flex:1}} onClick={()=>locate(maxAcc)}>Ulangi lokasi</button><button className="button secondary" style={{flex:1}} onClick={cam?stopCam:openCam}>{cam?'Matikan kamera':'Nyalakan kamera'}</button></div></div>}
       <button className="button secondary" style={{width:'100%'}} onClick={()=>{stopCam();stopGps();setSt(null);setPin('');setPos(null);setMsg(null)}}>Keluar</button></>}
     {msg&&<div role="status" style={{...card,marginTop:12,borderLeft:`5px solid ${msg.ok?'#13b8aa':'#ff3b5c'}`}}>{msg.t}</div>}
