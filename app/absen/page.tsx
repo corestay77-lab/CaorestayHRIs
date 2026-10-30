@@ -9,21 +9,23 @@ export default function Absen(){
   const [code,setCode]=useState(''),[pin,setPin]=useState(''),[st,setSt]=useState<St|null>(null),[msg,setMsg]=useState<{t:string;ok:boolean}|null>(null),[busy,setBusy]=useState(false);
   const [pos,setPos]=useState<GeolocationPosition|null>(null),[locating,setLocating]=useState(false),[cam,setCam]=useState(false);
   const [qr,setQr]=useState(''),[hotel,setHotel]=useState<string|null>(null),[qrErr,setQrErr]=useState('');
+  const [secs,setSecs]=useState(0),tick=useRef<any>(null),tout=useRef<any>(null);
   const vid=useRef<HTMLVideoElement>(null),stream=useRef<MediaStream|null>(null),watch=useRef<number|null>(null);
   const say=(t:string,ok=false)=>setMsg({t,ok});
   const stopCam=()=>{stream.current?.getTracks().forEach(t=>t.stop());stream.current=null;setCam(false)};
-  const stopGps=()=>{if(watch.current!==null)navigator.geolocation.clearWatch(watch.current);watch.current=null;setLocating(false)};
+  const stopGps=()=>{if(watch.current!==null)navigator.geolocation.clearWatch(watch.current);watch.current=null;clearInterval(tick.current);clearTimeout(tout.current);setLocating(false)};
   useEffect(()=>{
     let q=new URLSearchParams(location.search).get('q')||'';
     try{setCode(localStorage.getItem('cs-emp-code')||'');if(q)localStorage.setItem('cs-qr',q);else q=localStorage.getItem('cs-qr')||''}catch{}
     setQr(q);if(!q){setQrErr('Scan QR absen di pos security hotel untuk memulai.');return}
     fetch('/api/absen?q='+encodeURIComponent(q)).then(r=>r.json()).then(r=>{if(r.ok)setHotel(r.hotel);else{setQrErr(r.error);try{localStorage.removeItem('cs-qr')}catch{}}}).catch(()=>setQrErr('Tidak bisa terhubung ke server. Periksa koneksi internet.'));
     return()=>{stopCam();stopGps()}},[]);
-  // Ambil lokasi: terus memperbaiki akurasi sampai memenuhi batas atau 20 detik.
-  const locate=(max=100)=>{stopGps();setPos(null);setLocating(true);setMsg(null);
-    const t=setTimeout(stopGps,20000);
-    watch.current=navigator.geolocation.watchPosition(p=>{setPos(old=>!old||p.coords.accuracy<=old.coords.accuracy?p:old);if(p.coords.accuracy<=max){clearTimeout(t);stopGps()}},
-      ()=>{clearTimeout(t);stopGps();say('Lokasi tidak bisa diakses. Izinkan lokasi di browser.')},{enableHighAccuracy:true,timeout:20000,maximumAge:0})};
+  // Ambil lokasi: GPS HP butuh waktu untuk 'mengunci' (awalnya hanya lokasi jaringan yang kasar). Terus dipantau sampai akurasi memenuhi batas
+  // (maks 3 menit), dan posisi terbaik dipakai. Kegagalan sesaat tidak menghentikan pencarian.
+  const locate=(max=100)=>{stopGps();setPos(null);setLocating(true);setMsg(null);setSecs(0);const t0=Date.now();
+    tick.current=setInterval(()=>setSecs(Math.round((Date.now()-t0)/1000)),1000);tout.current=setTimeout(stopGps,180000);
+    watch.current=navigator.geolocation.watchPosition(p=>{setPos(old=>!old||p.coords.accuracy<=old.coords.accuracy?p:old);if(p.coords.accuracy<=max)stopGps()},
+      e=>{if(e.code===1){stopGps();say('Izin lokasi ditolak. Izinkan lokasi untuk situs ini di pengaturan browser, lalu tekan Ulangi lokasi.')}},{enableHighAccuracy:true,timeout:30000,maximumAge:0})};
   const openCam=async()=>{try{if(stream.current)stream.current.getTracks().forEach(t=>t.stop());const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});stream.current=s;setCam(true);return true}catch{setCam(false);say('Kamera tidak bisa diakses. Izinkan kamera di browser (alamat harus https).');return false}};
   useEffect(()=>{const v=vid.current;if(cam&&v&&stream.current&&v.srcObject!==stream.current){v.srcObject=stream.current;v.play().catch(()=>{})}},[cam,st]);
   const login=async()=>{setBusy(true);setMsg(null);
@@ -39,7 +41,7 @@ export default function Absen(){
   const maxAcc=st?.maxAcc||100,accOk=!!pos&&pos.coords.accuracy<=maxAcc;
   const send=async()=>{if(!st||st.kind==='done')return;
     if(!pos){say(locating?'Lokasi masih dicari, tunggu beberapa detik.':'Lokasi belum terbaca. Mencari lokasi lagi…');if(!locating)locate(maxAcc);return}
-    if(!accOk){say(`Akurasi GPS ±${Math.round(pos.coords.accuracy)} m, perlu ≤ ${maxAcc} m. Pindah ke area terbuka (dekat jendela/luar ruangan) lalu tekan Ulangi lokasi.`);return}
+    if(!accOk){{const a=Math.round(pos.coords.accuracy);say(a>500?`Sinyal GPS belum terkunci (±${a} m, masih lokasi jaringan). Pastikan Lokasi HP aktif mode akurasi tinggi dan buka halaman ini di Chrome/Safari (bukan dari dalam WhatsApp/aplikasi lain), lalu tunggu 30–60 detik.`:`Akurasi GPS ±${a} m, perlu ≤ ${maxAcc} m. Tunggu beberapa detik sampai akurasi membaik, atau minta HRD menaikkan batas akurasi di Pengaturan.`);return}}
     if(!cam||!vid.current?.videoWidth){say('Kamera belum siap. Mengaktifkan kamera…');await openCam();return}
     setBusy(true);setMsg(null);
     const s=await selfie();if(!s.img){say(s.why!);setBusy(false);return}
@@ -63,7 +65,7 @@ export default function Absen(){
       {st.kind==='done'?<div className="badge ok" style={{display:'block',textAlign:'center',padding:12,marginBottom:12}}>Absensi hari ini selesai ✓</div>
       :<div style={card}><video ref={vid} playsInline muted style={{width:'100%',borderRadius:14,display:cam?'block':'none',transform:'scaleX(-1)',marginBottom:10}}/>
         <div style={{display:'flex',gap:8,marginBottom:10,fontSize:12,flexWrap:'wrap'}}>
-          <span className={`badge ${accOk?'ok':'wait'}`}>{pos?`Lokasi ±${Math.round(pos.coords.accuracy)} m${accOk?'':` (perlu ≤ ${maxAcc} m)`}`:locating?'Mencari lokasi…':'Lokasi belum siap'}</span>
+          <span className={`badge ${accOk?'ok':'wait'}`}>{pos?`Lokasi ±${Math.round(pos.coords.accuracy)} m${accOk?'':` (perlu ≤ ${maxAcc} m)${locating?` · ${secs} dtk`:''}`}`:locating?`Mencari lokasi… ${secs} dtk`:'Lokasi belum siap'}</span>
           <span className={`badge ${cam?'ok':'wait'}`}>{cam?'Kamera siap':'Kamera belum siap'}</span></div>
         <button className="button" style={{width:'100%',padding:16,fontSize:17}} disabled={busy} onClick={send}>{busy?'Memproses…':st.kind==='in'?'Absen Masuk':'Absen Pulang'}</button>
         <div style={{display:'flex',gap:8,marginTop:10}}><button className="button secondary" style={{flex:1}} onClick={()=>locate(maxAcc)}>Ulangi lokasi</button><button className="button secondary" style={{flex:1}} onClick={cam?stopCam:openCam}>{cam?'Matikan kamera':'Nyalakan kamera'}</button></div></div>}
