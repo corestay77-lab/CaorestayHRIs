@@ -6,6 +6,7 @@ import HotelSetup from '@/components/HotelSetup';
 import DatabaseCard from '@/components/DatabaseCard';
 import { useDB, uid, assignCode, api, loadAll } from '@/lib/store';
 import { EMPTY, Settings } from '@/lib/payroll';
+const BASE_SHIFTS=['Pagi','Siang','Malam'];
 const ROLES:[string,string][]=[['Admin','Akses penuh, termasuk pengaturan dan buka kunci payroll'],['HRD','Karyawan, kompensasi, dan rekap absensi'],['Payroll','Proses payroll, koreksi, approval, dan lock'],['Manager','Melihat laporan dan labor cost'],['Viewer','Hanya melihat']];
 function Inp({label,v,onSave,type='text'}:{label:string;v:string|number;onSave:(s:string)=>void;type?:string}){
   return <div className="field"><label>{label}</label><input type={type} defaultValue={v} key={String(v)} onBlur={e=>{if(e.target.value!==String(v))onSave(e.target.value)}}/></div>}
@@ -39,6 +40,17 @@ export default function SettingsPage(){
           <td style={{whiteSpace:'nowrap'}}><button className="button secondary" disabled={!u.active||S.activeUser===u.id} onClick={()=>update(d=>({...d,settings:{...d.settings,activeUser:u.id}}),`Ganti pengguna aktif → ${u.id}`)}>Pakai</button> <button className="button secondary" disabled={S.activeUser===u.id} onClick={()=>setUser(u.id,{active:!u.active},u.active?'dinonaktifkan':'diaktifkan')}>{u.active?'Nonaktifkan':'Aktifkan'}</button> <button className="button secondary" disabled={S.activeUser===u.id} onClick={()=>update(d=>({...d,settings:{...d.settings,users:d.settings.users.filter(x=>x.id!==u.id)}}),`Hapus pengguna ${u.id}`)}>Hapus</button></td></tr>)}</tbody></table></div>
       <div className="table-wrap"><table><tbody>{ROLES.map(r=><tr key={r[0]}><td><b>{r[0]}</b></td><td>{r[1]}</td></tr>)}</tbody></table></div>
       <p className="muted">Akses aplikasi dilindungi satu password HRD. Pengguna aktif dipakai untuk identitas di topbar dan Audit Log; pembatasan akses per peran belum ditegakkan.</p></section>
+    <section className="card panel" style={{marginTop:12}}><h2>Shift Kerja</h2>
+      <p className="muted">Tiga shift utama (Pagi, Siang, Malam) sudah disiapkan, jamnya bisa diubah. Tambahkan shift khusus bila perlu (mis. Middle, Split). Dipakai di Absensi → Daftar Bulanan untuk jam masuk, keterlambatan, dan lembur.</p>
+      <div className="table-wrap"><table><thead><tr><th>Shift</th><th>Mulai</th><th>Selesai</th><th></th></tr></thead><tbody>
+        {db.shifts.map(sh=>{const base=BASE_SHIFTS.includes(sh.name);const setT=(k:'start'|'end',v:string)=>v&&v!==sh[k]&&update(d=>({...d,shifts:d.shifts.map(x=>x.name===sh.name?{...x,[k]:v}:x)}),`Shift ${sh.name}: ${k==='start'?'mulai':'selesai'} ${v}`);
+          return <tr key={sh.name}><td>{sh.name} <span className={`badge ${base?'':'wait'}`}>{base?'utama':'khusus'}</span></td>
+            <td><input type="time" defaultValue={sh.start} key={sh.name+sh.start} aria-label={`Mulai ${sh.name}`} onBlur={e=>setT('start',e.target.value)}/></td><td><input type="time" defaultValue={sh.end} key={sh.name+sh.end} aria-label={`Selesai ${sh.name}`} onBlur={e=>setT('end',e.target.value)}/></td>
+            <td>{base?<span className="muted">tidak bisa dihapus</span>:<button className="button secondary" onClick={()=>{const used=db.sched.filter(x=>x.shift===sh.name).length;if(used&&!confirm(`Shift ${sh.name} dipakai di ${used} jadwal. Hapus shift dan jadwalnya?`))return;update(d=>({...d,shifts:d.shifts.filter(x=>x.name!==sh.name),sched:d.sched.filter(x=>x.shift!==sh.name)}),`Hapus shift ${sh.name}`)}}>Hapus</button>}</td></tr>})}</tbody></table></div>
+      <h3 style={{fontSize:13,margin:'14px 0 0'}}>Tambah shift khusus</h3>
+      <Form fields={[{k:'n',label:'Nama shift',req:true},{k:'s',label:'Mulai',type:'time',req:true},{k:'e',label:'Selesai',type:'time',req:true}]} btn="Tambah shift"
+        onAdd={v=>{const n=v.n.trim();if(n.toLowerCase()==='libur'||db.shifts.some(x=>x.name.toLowerCase()===n.toLowerCase()))return alert('Nama shift sudah dipakai');update(d=>({...d,shifts:[...d.shifts,{name:n,start:v.s,end:v.e}]}),`Tambah shift ${n} ${v.s}–${v.e}`)}}/>
+      <p className="muted">Shift yang selesai lebih awal dari mulainya (mis. 23:00–07:00) dihitung melewati tengah malam.</p></section>
     <section className="card panel" style={{marginTop:12}}><h2>Parameter Absensi (default)</h2><div style={grid}>
       <Inp label="Radius default hotel (meter)" type="number" v={S.radius} onSave={sv('radius','radius default')}/><Inp label="Jam masuk default hotel" type="time" v={S.shift} onSave={sv('shift','jam masuk default')}/><Inp label="Toleransi keterlambatan (menit)" type="number" v={S.tol} onSave={sv('tol','toleransi telat')}/><Inp label="Akurasi GPS maksimal (meter)" type="number" v={S.maxAcc} onSave={sv('maxAcc','akurasi GPS maks')}/><Inp label="Potongan telat (Rp per menit)" type="number" v={S.lateCut} onSave={sv('lateCut','potongan telat per menit')}/></div>
       <p className="muted">Radius dan jam masuk default dipakai saat hotel baru didaftarkan. Absen ditolak bila akurasi GPS lebih buruk dari batas. Potongan telat 0 = tidak ada potongan telat; potongan alpa (gaji pokok ÷ 26 per hari) selalu dihitung otomatis dari rekap.</p></section>

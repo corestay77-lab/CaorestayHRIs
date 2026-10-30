@@ -5,10 +5,11 @@ import Shell from '@/components/Shell';
 import Form from '@/components/Form';
 import { useDB, uid, attAdd, attSet, attDel } from '@/lib/store';
 import { calc, recap, rp } from '@/lib/payroll';
-import { days, nowWIB } from '@/lib/geo';
-const TABS=['Rekap','Harian','Jadwal (opsional)'];
+import { nowWIB } from '@/lib/geo';
+const TABS=['Rekap','Harian','Daftar Bulanan'];
+const STAT=['Sakit','Izin','Cuti','Alpa'],code=(n:string)=>n.slice(0,3);
 export default function Attendance(){
-  const {db,update,locked}=useDB();const [tab,setTab]=useState(TABS[0]),[hotel,setHotel]=useState(''),[date,setDate]=useState(nowWIB().date),[err,setErr]=useState('');
+  const {db,update,locked}=useDB();const [tab,setTab]=useState(TABS[0]),[dept,setDept]=useState(''),[hotel,setHotel]=useState(''),[date,setDate]=useState(nowWIB().date),[err,setErr]=useState('');
   const name=(id:string)=>db.emps.find(e=>e.id===id)?.name||'—';
   const act=db.emps.filter(e=>e.status==='Aktif'&&(!hotel||e.hotel===hotel));
   const R=act.map(e=>({e,r:recap(e.id,db),c:calc(e,db)}));
@@ -19,7 +20,7 @@ export default function Attendance(){
   const sched=db.sched.filter(s=>s.date.startsWith(db.period)).sort((a,b)=>a.date.localeCompare(b.date));
   const day=db.att.filter(a=>a.date===date).sort((a,b)=>(a.in||'').localeCompare(b.in||''));
   const step=(l:string,href?:string)=>href?<Link href={href} className="badge">{l}</Link>:<span className="badge">{l}</span>;
-  return <Shell title="Rekap Absensi" sub="Karyawan scan QR & absen → otomatis masuk rekap → potongan otomatis masuk Payroll. Tanpa persetujuan berlapis.">
+  return <Shell title="Rekap Absensi" sub="Karyawan scan QR & absen → otomatis masuk rekap → potongan otomatis masuk Payroll. Daftar bulanan per departemen ada di tab Daftar Bulanan.">
     <div className="card panel" style={{marginBottom:12,display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>{step('1. Karyawan absen (QR + PIN)')}→{step('2. Rekap otomatis (halaman ini)')}→{step('3. Payroll: potongan terhitung otomatis','/payroll')}</div>
     <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>{TABS.map(t=><button key={t} className={t===tab?'button':'button secondary'} onClick={()=>setTab(t)}>{t}</button>)}</div>
     {err&&<p role="alert" className="badge bad" style={{marginBottom:10,whiteSpace:'normal'}}>{err}</p>}
@@ -40,10 +41,29 @@ export default function Attendance(){
       <section className="card panel" style={{marginTop:12}}><h2>Input manual (sakit / izin / cuti / alpa / koreksi)</h2><Form disabled={locked||!db.emps.length} fields={[{k:'emp',label:'Karyawan',type:'select',opts:db.emps.map(e=>[e.id,e.name])},{k:'date',label:'Tanggal',type:'date',req:true},{k:'st',label:'Status',type:'select',opts:['Sakit','Izin','Cuti','Alpa','Hadir'].map(s=>[s,s])},{k:'ot',label:'Jam lembur',type:'number'}]}
         onAdd={v=>{const emp=v.emp||db.emps[0].id,st=v.st||'Sakit';run(()=>attAdd({empId:emp,date:v.date,status:st,otHours:Number(v.ot)||0},`Absensi manual ${name(emp)} ${v.date}: ${st}`))}}/>
         <p className="muted">Karyawan yang tidak scan tidak perlu diinput kalau memakai jadwal: alpa dihitung otomatis. Input manual dipakai untuk sakit/izin/cuti atau koreksi.</p></section></>}
-    {tab===TABS[2]&&<><section className="card panel"><h2>Atur jadwal shift</h2><p className="muted">Opsional. Tanpa jadwal, jam masuk memakai jam default hotel (+8 jam kerja). Dengan jadwal, keterlambatan, lembur, dan alpa otomatis mengikuti shift.</p>
-      <Form disabled={locked||!db.emps.length} fields={[{k:'emp',label:'Karyawan',type:'select',opts:db.emps.map(e=>[e.id,e.name])},{k:'from',label:'Dari',type:'date',req:true},{k:'to',label:'Sampai',type:'date',req:true},{k:'sh',label:'Shift',type:'select',opts:db.shifts.map(s=>[s.name,`${s.name} ${s.start}–${s.end}`])}]}
-      btn="Simpan jadwal" onAdd={v=>{const emp=v.emp||db.emps[0].id,sh=v.sh||db.shifts[0].name,ds=days(v.from,v.to);update(d=>({...d,sched:[...d.sched.filter(s=>!(s.empId===emp&&ds.includes(s.date))),...ds.map(date=>({id:uid(),empId:emp,date,shift:sh}))]}),`Jadwal ${name(emp)} ${v.from}–${v.to}: ${sh}`)}}/></section>
-      <section className="card panel" style={{marginTop:12}}><h2>Definisi shift</h2><Form disabled={locked} fields={[{k:'n',label:'Nama',req:true},{k:'s',label:'Mulai',type:'time',req:true},{k:'e',label:'Selesai',type:'time',req:true}]} onAdd={v=>update(d=>({...d,shifts:[...d.shifts.filter(x=>x.name!==v.n),{name:v.n,start:v.s,end:v.e}]}),`Shift ${v.n} ${v.s}–${v.e}`)}/>
-      <p className="muted">{db.shifts.map(s=>`${s.name} ${s.start}–${s.end}`).join(' · ')}</p></section>
-      <section className="card panel" style={{marginTop:12}}><h2>Jadwal {db.period} ({sched.length})</h2><div className="table-wrap"><table><tbody>{sched.map(s=><tr key={s.id}><td>{s.date}</td><td>{name(s.empId)}</td><td><span className="badge">{s.shift}</span></td><td><button className="button secondary" disabled={locked} onClick={()=>update(d=>({...d,sched:d.sched.filter(x=>x.id!==s.id)}))}>Hapus</button></td></tr>)}{!sched.length&&<tr><td className="muted">Belum ada jadwal.</td></tr>}</tbody></table></div></section></>}
+    {tab===TABS[2]&&(()=>{
+      const dp=dept||db.depts[0]||'',list=db.emps.filter(e=>e.status==='Aktif'&&e.dept===dp&&(!hotel||e.hotel===hotel)),[y,m]=db.period.split('-').map(Number),dim=new Date(Date.UTC(y,m,0)).getUTCDate();
+      const ds=Array.from({length:dim},(_,i)=>`${db.period}-${String(i+1).padStart(2,'0')}`);
+      const manual=(eid:string,d:string)=>db.att.filter(a=>a.empId===eid&&a.date===d&&a.src==='manual'&&a.status!=='Hadir');
+      const val=(eid:string,d:string)=>manual(eid,d)[0]?.status||db.sched.find(x=>x.empId===eid&&x.date===d)?.shift||'';
+      const qrIn=(eid:string,d:string)=>db.att.find(a=>a.empId===eid&&a.date===d&&a.src==='qr');
+      // Satu sel = satu pilihan: shift / Libur (jadwal) atau Sakit/Izin/Cuti/Alpa (absensi manual). Scan karyawan tetap tercatat terpisah.
+      const setCell=(e:typeof list[0],d:string,v:string)=>run(async()=>{
+        update(x=>({...x,sched:[...x.sched.filter(s=>!(s.empId===e.id&&s.date===d)),...(v&&!STAT.includes(v)?[{id:uid(),empId:e.id,date:d,shift:v}]:[])]}));
+        for(const a of manual(e.id,d))await attDel(a.id,`Daftar bulanan ${e.name} ${d}: ubah`);
+        if(STAT.includes(v))await attAdd({empId:e.id,date:d,status:v},`Daftar bulanan ${e.name} ${d}: ${v}`)});
+      const fillRow=(e:typeof list[0],v:string)=>{if(!v||!confirm(`Isi semua hari ${db.period} untuk ${e.name} dengan "${v}"? (hari yang sudah berisi akan diganti)`))return;
+        update(x=>({...x,sched:[...x.sched.filter(s=>!(s.empId===e.id&&s.date.startsWith(db.period))),...(STAT.includes(v)?[]:ds.map(d=>({id:uid(),empId:e.id,date:d,shift:v})))]}),`Daftar bulanan ${e.name} ${db.period}: isi semua ${v}`)};
+      const opts=[...db.shifts.map(s=>s.name),'Libur',...STAT];
+      return <><section className="card panel"><div className="toolbar"><h2>Daftar hadir {db.period} · {dp||'—'}</h2><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        <select value={dp} onChange={e=>setDept(e.target.value)} aria-label="Departemen">{db.depts.map(d=><option key={d}>{d}</option>)}</select>
+        <select value={hotel} onChange={e=>setHotel(e.target.value)} aria-label="Filter hotel"><option value="">Semua hotel</option>{db.hotels.map(h=><option key={h}>{h}</option>)}</select></div></div>
+        <p className="muted">Isi satu bulan penuh per departemen: pilih shift (jadwal) atau Libur / Sakit / Izin / Cuti / Alpa di tiap tanggal. Titik hijau (●) = karyawan sudah scan absen hari itu. Hari terjadwal yang lewat tanpa scan atau keterangan dihitung alpa otomatis; Libur tidak. Hasilnya langsung masuk Rekap dan Payroll. Shift diatur di Pengaturan.</p>
+        <p className="muted">Kode: {db.shifts.map(s=>`${code(s.name)} = ${s.name} ${s.start}–${s.end}`).join(' · ')} · Lib = Libur · Sak = Sakit · Izi = Izin · Cut = Cuti · Alp = Alpa</p>
+        <div className="table-wrap"><table><thead><tr><th style={{position:'sticky',left:0,background:'#f6f9ff'}}>Karyawan</th><th>Isi semua</th>{ds.map((d,i)=><th key={d} style={{padding:'11px 3px',textAlign:'center'}}>{i+1}</th>)}</tr></thead><tbody>
+        {list.map(e=><tr key={e.id}><td style={{position:'sticky',left:0,background:'#fff'}}>{e.name}<div className="muted">{e.code||'—'}</div></td>
+          <td><select disabled={locked} value="" aria-label={`Isi semua ${e.name}`} onChange={ev=>fillRow(e,ev.target.value)}><option value="">…</option>{opts.map(o=><option key={o} value={o}>{o}</option>)}</select></td>
+          {ds.map(d=>{const v=val(e.id,d),q=qrIn(e.id,d);return <td key={d} style={{padding:'6px 2px',textAlign:'center'}}><select disabled={locked} value={v} title={`${e.name} ${d}${q?` · scan ${q.in||''}${q.out?'–'+q.out:''}`:''}`} aria-label={`${e.name} ${d}`} style={{width:54,padding:'6px 2px',fontSize:11,background:v==='Alpa'?'#ffe4e9':v?'#eef3ff':'#fff'}} onChange={ev=>setCell(e,d,ev.target.value)}><option value=""></option>
+            {opts.map(o=><option key={o} value={o}>{code(o)}</option>)}</select>{q&&<div style={{color:'#13b8aa',fontSize:9,lineHeight:1}}>●</div>}</td>})}</tr>)}
+        {!list.length&&<tr><td className="muted" colSpan={dim+2}>Tidak ada karyawan aktif di departemen ini.</td></tr>}</tbody></table></div></section></>})()}
   </Shell>}

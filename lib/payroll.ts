@@ -21,7 +21,7 @@ export const rp=(n:number)=>'Rp '+Math.round(n).toLocaleString('id-ID');
 // Alpa = input manual + hari terjadwal yang sudah lewat tanpa absensi (otomatis, hanya bila karyawan memakai jadwal).
 export function recap(empId:string,db:DB,p=db.period){
   const att=db.att.filter(a=>a.empId===empId&&a.date.startsWith(p)),has=new Set(att.map(a=>a.date)),today=nowWIB().date;
-  const autoAlpa=db.sched.filter(s=>s.empId===empId&&s.date.startsWith(p)&&s.date<today&&!has.has(s.date)).length;
+  const autoAlpa=db.sched.filter(s=>s.empId===empId&&s.date.startsWith(p)&&s.shift!=='Libur'&&s.date<today&&!has.has(s.date)).length;
   const n=(s:Att['status'])=>att.filter(a=>a.status===s).length,sum=(f:(a:Att)=>number)=>att.reduce((t,a)=>t+f(a),0);
   return {hadir:n('Hadir'),telat:att.filter(a=>a.status==='Hadir'&&(a.lateMin||0)>0).length,lateMin:sum(a=>a.lateMin||0),sakit:n('Sakit'),izin:n('Izin'),cuti:n('Cuti'),alpa:n('Alpa')+autoAlpa,autoAlpa,otHours:sum(a=>a.otHours||0),hours:sum(a=>a.hours||0),belumPulang:att.filter(a=>a.in&&!a.out).length}}
 export function compute(e:Emp,db:DB){
