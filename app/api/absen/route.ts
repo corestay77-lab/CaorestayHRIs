@@ -69,6 +69,6 @@ export async function POST(req:Request){
     // pulang: jam kerja & usulan lembur (kelipatan 30 menit setelah jam selesai shift, maks 4 jam) langsung masuk rekap
     const o=p.open!,sh=shiftOf(d,e.id,o.work_date,geo),hours=+((absMin(p.n.date,p.n.time)-absMin(o.work_date,o.clock_in))/60).toFixed(2);
     let end=toMin(sh.end);if(end<=toMin(sh.start))end+=1440;
-    const outM=absMin(p.n.date,p.n.time)-absMin(o.work_date,'00:00'),ot=Math.min(4,Math.floor(Math.max(0,outM-end)/30)/2);
+    const outM=absMin(p.n.date,p.n.time)-absMin(o.work_date,'00:00'),ot=Math.min(d.settings.otMax===undefined?4:Number(d.settings.otMax)||0,Math.floor(Math.max(0,outM-end)/30)/2);
     await q(`update hr_att set clock_out=$2, hours=$3, ot_hours=$4, note=case when $5::text is null then note else coalesce(note||' · ','')||$5::text end where id=$1`,[o.id,p.n.time,hours,ot,warn?'⚠ pulang: '+warn:null]);
     return json({ok:true,kind:'out',time:p.n.time,hours,ot,warn})}catch(e:any){return fail(errMsg(e),500)}}

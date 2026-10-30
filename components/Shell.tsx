@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { LayoutDashboard,Building2,ContactRound,CalendarCheck,Wallet,ChartNoAxesCombined,Settings,Search,Bell,ChevronDown } from 'lucide-react';
 import { useDB, api, refreshGate } from '@/lib/store';
 import Gate from './Gate';
+import { APP_VERSION } from '@/lib/version';
 import { nowWIB } from '@/lib/geo';
 // Sidebar diringkas: menu yang saling berkaitan digabung, halaman di dalamnya tampil sebagai tab.
 export const groups=[
@@ -29,7 +30,7 @@ export default function Shell({title,sub,children}:{title:string;sub?:string;chi
   return <><div className="mnav"><img src="/logo-icon.png" alt="CoreStay" width={30} height={30} style={{flex:"0 0 30px"}}/>{groups.map(g=><Link key={g.label} href={g.tabs[0][1]} className={g===grp?'active':''}>{g.label}</Link>)}</div>
   <div className="app"><aside className="sidebar"><Link href="/" className="brandlogo" aria-label="CoreStay Advisory · People"><img src="/logo.png" alt="CoreStay Advisory" width={170} height={150}/></Link><div className="appname">PEOPLE · HR · ATTENDANCE · PAYROLL</div>
     <nav className="nav">{groups.map(g=>{const I=g.icon;return <Link key={g.label} href={g.tabs[0][1]} className={g===grp?'active':''}><I size={18}/>{g.label}</Link>})}</nav>
-    <footer className="sfoot"><b>{db.settings.company}</b><div>CoreStay People · v0.1.0</div><div>© {new Date().getFullYear()} All rights reserved</div><div>Data tersimpan di database Vercel</div></footer></aside>
+    <footer className="sfoot"><b>{db.settings.company}</b><div>CoreStay People · v{APP_VERSION}</div><div>© {new Date().getFullYear()} All rights reserved</div><div>Data tersimpan di database Vercel</div></footer></aside>
     <main className="main"><header className="topbar"><div className="search"><Search size={17} color="#6a7a9e"/><input ref={ref} value={q} onChange={e=>{setQ(e.target.value);setOpen(true)}} onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),150)} placeholder="Cari karyawan atau menu…" aria-label="Cari"/><kbd>Ctrl K</kbd>
       {open&&hits.length>0&&<div className="results">{hits.map((h,i)=><Link key={i} href={h.h} onClick={()=>setQ('')}><span>{h.l}</span><span className="muted">{h.s}</span></Link>)}</div>}</div>
       <div className="top-right"><div className="chip org"><Building2 size={18} color="#1d5bff"/><div><b>{db.settings.company}</b><small>{db.settings.companyId} · {db.hotels.length} Hotel</small></div><ChevronDown size={14}/></div>
