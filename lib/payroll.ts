@@ -1,5 +1,5 @@
 import { nowIn, okTz, DEFAULT_TZ } from './geo';
-export type Emp={id:string;code?:string;name:string;hotel:string;dept:string;position:string;joinDate:string;status:'Aktif'|'Nonaktif';basic:number;allowance:number;deduction:number;thrFactor:number;comps?:Record<string,number>};
+export type Emp={id:string;code?:string;name:string;hotel:string;dept:string;position:string;joinDate:string;status:'Aktif'|'Nonaktif';basic:number;allowance:number;deduction:number;thrFactor:number;comps?:Record<string,number>;medical?:number;meal?:number;ptkp?:number;insurance?:number;otherCost?:number};
 // Satu baris absensi. Karyawan yang scan QR tercatat otomatis (src 'qr'); sakit/izin/cuti/koreksi diinput HRD (src 'manual').
 export type Att={id:string;empId:string;date:string;status:'Hadir'|'Sakit'|'Izin'|'Alpa'|'Cuti';otHours:number;src?:'manual'|'qr'|'selfie';in?:string;out?:string;dist?:number;late?:boolean;lateMin?:number;hours?:number;note?:string};
 export type Shift={name:string;start:string;end:string};
@@ -8,15 +8,16 @@ export type Geo={lat:number;lng:number;radius:number;shift:string;qr?:string;tz?
 export type Corr={id:string;entered?:string;empId:string;from:string;period:string;desc:string;amount:number};
 export type User={id:string;name:string;email:string;role:string;active:boolean};
 export type Comp={id:string;name:string;type:'Tunjangan'|'Potongan';amount:number;bpjs:boolean};
-export type Settings={company:string;companyId:string;npwp:string;address:string;phone:string;email:string;empPrefix:string;empDigits:number;empNext:number;radius:number;shift:string;tol:number;maxAcc:number;lateCut:number;geoMode:'strict'|'soft';tz:string;otDiv:number;otRate1:number;otRate2:number;otMax:number;alpaDiv:number;comps:Comp[];activeUser:string;users:User[]};
+export type Settings={company:string;companyId:string;npwp:string;address:string;phone:string;email:string;empPrefix:string;empDigits:number;empNext:number;radius:number;shift:string;tol:number;maxAcc:number;lateCut:number;geoMode:'strict'|'soft';tz:string;jsCo:number;jsEmp:number;otDiv:number;otRate1:number;otRate2:number;otMax:number;alpaDiv:number;comps:Comp[];activeUser:string;users:User[]};
 export type PStatus='draft'|'submitted'|'approved'|'locked';
 export type DB={hotels:string[];depts:string[];emps:Emp[];att:Att[];corr:Corr[];geo:Record<string,Geo>;shifts:Shift[];sched:Sched[];closed:Record<string,boolean>;budget:Record<string,number>;periods:Record<string,PStatus>;period:string;audit:{t:string;m:string;u?:string}[];snap:Record<string,Record<string,any>>;settings:Settings;lastSync:string|null};
-export const EMPTY:DB={hotels:[],depts:['Front Office','Housekeeping','F&B','Engineering','Sales & Marketing','Finance','HR'],emps:[],att:[],corr:[],geo:{},shifts:[{name:'Pagi',start:'07:00',end:'15:00'},{name:'Siang',start:'15:00',end:'23:00'},{name:'Malam',start:'23:00',end:'07:00'}],sched:[],closed:{},budget:{},periods:{},period:new Date().toISOString().slice(0,7),audit:[],snap:{},settings:{company:'CoreStay Advisory',companyId:'CSA-001',npwp:'',address:'',phone:'',email:'',empPrefix:'EMP',empDigits:4,empNext:1,radius:100,shift:'08:00',tol:0,maxAcc:100,lateCut:0,geoMode:'strict',tz:DEFAULT_TZ,otDiv:173,otRate1:1.5,otRate2:2,otMax:4,alpaDiv:26,comps:[],activeUser:'USR-001',users:[{id:'USR-001',name:'HR Manager',email:'',role:'Admin',active:true}]},lastSync:null};
+export const EMPTY:DB={hotels:[],depts:['Front Office','Housekeeping','F&B','Engineering','Sales & Marketing','Finance','HR'],emps:[],att:[],corr:[],geo:{},shifts:[{name:'Pagi',start:'07:00',end:'15:00'},{name:'Siang',start:'15:00',end:'23:00'},{name:'Malam',start:'23:00',end:'07:00'}],sched:[],closed:{},budget:{},periods:{},period:new Date().toISOString().slice(0,7),audit:[],snap:{},settings:{company:'CoreStay Advisory',companyId:'CSA-001',npwp:'',address:'',phone:'',email:'',empPrefix:'EMP',empDigits:4,empNext:1,radius:100,shift:'08:00',tol:0,maxAcc:100,lateCut:0,geoMode:'strict',tz:DEFAULT_TZ,jsCo:4.89,jsEmp:2,otDiv:173,otRate1:1.5,otRate2:2,otMax:4,alpaDiv:26,comps:[],activeUser:'USR-001',users:[{id:'USR-001',name:'HR Manager',email:'',role:'Admin',active:true}]},lastSync:null};
 // Gabungkan data (mis. dari backup versi lama) dengan nilai default agar field baru selalu ada.
 export const normalize=(j:any):DB=>({...EMPTY,...j,settings:{...EMPTY.settings,...(j?.settings||{})}});
-// Tarif BPJS default. Verifikasi dengan regulasi terbaru sebelum dipakai untuk payroll nyata.
-export const RATE={kesEmp:.01,kesEr:.04,jhtEmp:.02,jhtEr:.037,jpEmp:.01,jpEr:.02,jkk:.0024,jkm:.003};
-export const CAP={kes:12_000_000,jp:10_042_300};
+// PTKP per tahun (TK = tidak kawin, K = kawin; angka = tanggungan). Dipakai sebagai saran pengisian kolom PTKP / tahun.
+export const PTKP:[string,number][]=[['TK/0',54e6],['TK/1',58.5e6],['TK/2',63e6],['TK/3',67.5e6],['K/0',58.5e6],['K/1',63e6],['K/2',67.5e6],['K/3',72e6]];
+// PPh 21 tahunan: tarif progresif 5% / 15% / 25% / 30% / 35% (lapisan 60 jt, 250 jt, 500 jt, 5 M).
+export const pph21=(pkp:number)=>{let rest=pkp,prev=0,t=0;for(const[l,r] of [[60e6,.05],[250e6,.15],[500e6,.25],[5e9,.3],[Infinity,.35]]){const w=Math.min(rest,l-prev);if(w<=0)break;t+=w*r;rest-=w;prev=l}return t};
 // Zona waktu sebuah hotel: pengaturan hotel → default perusahaan.
 export const tzOf=(db:DB,hotel?:string)=>okTz((hotel&&db.geo[hotel]?.tz)||db.settings.tz);
 export const rp=(n:number)=>'Rp '+Math.round(n).toLocaleString('id-ID');
@@ -27,20 +28,30 @@ export function recap(empId:string,db:DB,p=db.period){
   const autoAlpa=db.sched.filter(s=>s.empId===empId&&s.date.startsWith(p)&&s.shift!=='Libur'&&s.date<today&&!has.has(s.date)).length;
   const n=(s:Att['status'])=>att.filter(a=>a.status===s).length,sum=(f:(a:Att)=>number)=>att.reduce((t,a)=>t+f(a),0);
   return {hadir:n('Hadir'),telat:att.filter(a=>a.status==='Hadir'&&(a.lateMin||0)>0).length,lateMin:sum(a=>a.lateMin||0),sakit:n('Sakit'),izin:n('Izin'),cuti:n('Cuti'),alpa:n('Alpa')+autoAlpa,autoAlpa,otHours:sum(a=>a.otHours||0),hours:sum(a=>a.hours||0),belumPulang:att.filter(a=>a.in&&!a.out).length}}
+// MODEL BIAYA (sama dengan tabel "Data karyawan dan perhitungan biaya"):
+//  THR provisi = gaji pokok ÷ 12 · Jamsostek perusahaan/staf = % dari gaji pokok · gross = gaji + medical + makan + THR provisi
+//  biaya jabatan = 5% gross (maks 500 rb/bln) · PKP/bln = gross − biaya jabatan − PTKP÷12 · PPh/tahun = tarif progresif atas PKP×12
+//  TOTAL BIAYA PERUSAHAAN = gross + Jamsostek perusahaan + asuransi perusahaan + biaya lain
+// Kolom kosong dianggap 0. PPh baru dihitung setelah PTKP/tahun diisi (kosong = belum diketahui).
 export function compute(e:Emp,db:DB){
-  const r=recap(e.id,db),p=db.period,S=db.settings,{otHours,lateMin,hours,alpa}=r;
+  const r=recap(e.id,db),p=db.period,S=db.settings,n=(x?:number)=>Number(x)||0,{otHours,lateMin,hours,alpa}=r;
+  const basic=n(e.basic),medical=n(e.medical),meal=n(e.meal),thrProv=basic/12,jsCo=basic*n(S.jsCo)/100,jsEmp=basic*n(S.jsEmp)/100;
+  const gross=basic+medical+meal+thrProv,ptkp=n(e.ptkp),jabatan=Math.min(gross*.05,500000);
+  const pkpM=ptkp>0?Math.max(0,gross-jabatan-ptkp/12):0,pkpY=pkpM*12,pphY=ptkp>0?pph21(pkpY):0,pphM=pphY/12;
+  const insurance=n(e.insurance),other=n(e.otherCost),total=gross+jsCo+insurance+other;
+  // Penyesuaian bulan berjalan dari Rekap Absensi, komponen tambahan (Pengaturan), dan koreksi
   const h1=Math.min(otHours,1),h2=Math.max(otHours-1,0);
-  const overtime=e.basic/(S.otDiv||173)*(S.otRate1*h1+S.otRate2*h2),thr=e.basic*e.thrFactor;
-  const alpaCut=e.basic/(S.alpaDiv||26)*alpa,lateCut=lateMin*(S.lateCut||0); // potongan dari rekap absensi, otomatis
-  // komponen tunjangan/potongan tambahan dari Pengaturan; nominal bisa dibedakan per karyawan di Compensation Master
+  const overtime=basic/(S.otDiv||173)*(S.otRate1*h1+S.otRate2*h2);
+  const alpaCut=basic/(S.alpaDiv||26)*alpa,lateCut=lateMin*(S.lateCut||0);
   const lines=(S.comps||[]).map(c=>({name:c.name,type:c.type,bpjs:c.bpjs,amt:Number(e.comps?.[c.id]??c.amount)||0})).filter(l=>l.amt>0);
   const extraAllow=lines.filter(l=>l.type==='Tunjangan').reduce((t,l)=>t+l.amt,0),extraDed=lines.filter(l=>l.type==='Potongan').reduce((t,l)=>t+l.amt,0);
   const corr=db.corr.filter(c=>c.empId===e.id&&c.period===p).reduce((s,c)=>s+c.amount,0);
-  const gross=e.basic+e.allowance+extraAllow+overtime+thr,wage=e.basic+e.allowance+lines.filter(l=>l.type==='Tunjangan'&&l.bpjs).reduce((t,l)=>t+l.amt,0);
-  const kb=Math.min(wage,CAP.kes),jb=Math.min(wage,CAP.jp);
-  const kesEmp=kb*RATE.kesEmp,jhtEmp=wage*RATE.jhtEmp,jpEmp=jb*RATE.jpEmp,empBpjs=kesEmp+jhtEmp+jpEmp;
-  const erBpjs=kb*RATE.kesEr+wage*(RATE.jhtEr+RATE.jkk+RATE.jkm)+jb*RATE.jpEr;
-  return {otHours,alpa,lateMin,hours,overtime,thr,alpaCut,lateCut,extraAllow,extraDed,lines,corr,gross,kesEmp,jhtEmp,jpEmp,empBpjs,erBpjs,net:gross-empBpjs-e.deduction-extraDed-alpaCut-lateCut+corr,laborCost:gross+erBpjs+corr};
+  // Dibayar tunai bulan ini: THR provisi tidak dibayar bulanan (dicadangkan perusahaan).
+  const cash=basic+medical+meal+overtime+extraAllow,cuts=alpaCut+lateCut+extraDed;
+  return {basic,medical,meal,thrProv,jsCo,jsEmp,gross,ptkp,jabatan,pkpM,pkpY,pphY,pphM,insurance,other,total,
+    otHours,alpa,lateMin,hours,overtime,alpaCut,lateCut,extraAllow,extraDed,lines,corr,cash,
+    net:cash-jsEmp-pphM-cuts+corr,laborCost:total+overtime+extraAllow-cuts+corr};
 }
-// Periode terkunci memakai snapshot hasil hitung saat dikunci, bukan hitung ulang.
-export const calc=(e:Emp,db:DB)=>{const s=db.snap?.[db.period]?.[e.id] as ReturnType<typeof compute>|undefined;return s?{...s,lateCut:s.lateCut||0,extraAllow:s.extraAllow||0,extraDed:s.extraDed||0,lines:s.lines||[]}:compute(e,db)};
+export type Calc=ReturnType<typeof compute>;
+// Periode terkunci memakai snapshot saat dikunci. Snapshot format lama (tanpa pphM) tidak dipakai: dihitung ulang dengan model baru.
+export const calc=(e:Emp,db:DB):Calc=>{const s=db.snap?.[db.period]?.[e.id] as Calc|undefined;return s&&'pphM' in s?s:compute(e,db)};
