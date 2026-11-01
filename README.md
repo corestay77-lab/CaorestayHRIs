@@ -18,8 +18,13 @@ Karyawan scan QR di pos security → `/absen` → ID + PIN → **Absen Masuk / P
 - Server menolak bila: QR salah/diganti, QR hotel lain, PIN salah (terkunci 15 menit setelah 5×), akurasi GPS > batas (default 100 m), di luar radius hotel, atau tidak ada selfie dari kamera.
 - **Selfie & lokasi hanya untuk validasi. Foto tidak disimpan** (hanya jam, jarak, dan akurasi GPS yang tercatat).
 - Hasil langsung masuk **Absensi → Rekap** (hadir, telat, sakit/izin/cuti, alpa, lembur). Tidak ada validasi/persetujuan/closing absensi.
-- **Payroll** membaca rekap otomatis: potongan alpa (gaji pokok ÷ 26 per hari), potongan telat (Rp/menit, **Pengaturan**, default 0), dan lembur.
+- **Payroll** membaca lembur dari rekap. **Potongan absensi (alpa/telat) diisi manual** oleh HRD di Payroll; Rekap hanya memberi saran angka.
 - Sakit/izin/cuti/koreksi: input manual di Absensi → Harian. Jadwal shift bersifat opsional (dipakai untuk shift, lembur, dan alpa otomatis).
+
+## Master Payroll & sinkron dengan Hotel Budget
+**Payroll → Data karyawan dan perhitungan biaya** = Master Payroll yang sama dengan menu Master Payroll di Hotel Budget (posisi × jumlah staf).
+Untuk menyinkronkan: di Hotel Budget unduh **Draft (.json)** atau **Excel (.xlsx)**, lalu buka **Pengaturan → Integrasi · CoreStay Sync → Sinkronisasi Master Payroll**, pilih file, cek pratinjau, **Terapkan**. Impor ulang memperbarui baris yang sama, tidak menggandakan.
+Hubungkan karyawan ke posisinya di **Employee Master**: gaji kosong = mengikuti posisi. Setelah mengganti `package.json`, jalankan `npm install` (ada paket baru `xlsx`).
 
 ## Backup
 **Pengaturan → Database & Backup**: Buat/perbarui database, **Download backup**, **Restore backup** (mengganti seluruh data; menerima juga file backup lama dari versi yang menyimpan data di browser).
