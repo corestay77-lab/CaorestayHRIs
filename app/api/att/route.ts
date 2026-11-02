@@ -31,3 +31,13 @@ export async function DELETE(req:Request){ // ?id=… satu baris, atau ?emp=… 
     else if(emp){await q(`delete from hr_att where emp_id=$1`,[emp]);await q(`delete from hr_pin where emp_id=$1`,[emp])}
     else return json({error:'id atau emp wajib'},400);
     return json({ok:true})}catch(e:any){return json({error:errMsg(e)},500)}}
+// Isi banyak tanggal sekaligus untuk satu karyawan (Daftar Bulanan): hapus input manual lama di tanggal itu, lalu isi status baru (kosong = hanya menghapus).
+export async function PUT(req:Request){
+  const g=await guard();if(g)return g;
+  try{const b=await req.json(),dates:string[]=Array.isArray(b.dates)?b.dates.filter(okDate):[];
+    if(!b.empId||!dates.length||dates.length>62)return json({error:'Karyawan dan tanggal wajib diisi'},400);
+    if(b.status&&!ST.includes(b.status))return json({error:'Status tidak valid'},400);
+    for(const m of new Set(dates.map(x=>x.slice(0,7))))if(await periodLocked(m+'-01'))return json({error:`Payroll periode ${m} sudah dikunci`},423);
+    await q(`delete from hr_att where emp_id=$1 and work_date = any($2::text[]) and src='manual' and status<>'Hadir'`,[b.empId,dates]);
+    if(b.status)await q(`insert into hr_att(id,emp_id,work_date,status,ot_hours,src) select gen_random_uuid()::text,$1::text,d,$3::text,0,'manual' from unnest($2::text[]) as d`,[b.empId,dates,b.status]);
+    return json({ok:true})}catch(e:any){return json({error:errMsg(e)},500)}}

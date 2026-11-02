@@ -47,6 +47,7 @@ const afterAtt=async(log:string)=>{await loadAtt(true);update(d=>d,log)};
 export const attAdd=async(r:{empId:string;date:string;status:string;otHours?:number;note?:string},log:string)=>{await api('/api/att',{method:'POST',body:JSON.stringify(r)});await afterAtt(log)};
 export const attSet=async(id:string,patch:{otHours?:number;status?:string},log:string)=>{await api('/api/att',{method:'PATCH',body:JSON.stringify({id,...patch})});await afterAtt(log)};
 export const attDel=async(id:string,log:string)=>{await api('/api/att?id='+id,{method:'DELETE'});await afterAtt(log)};
+export const attCells=async(empId:string,dates:string[],status:string,log?:string)=>{await api('/api/att',{method:'PUT',body:JSON.stringify({empId,dates,status})});if(log)await afterAtt(log);else await loadAtt(true)};
 export const attDelEmp=async(empId:string)=>{await api('/api/att?emp='+empId,{method:'DELETE'});await loadAtt(true)};
 const sub=(f:()=>void)=>{subs.add(f);if(!booted){booted=true;refreshGate()}return()=>{subs.delete(f)}};
 export function useDB(){

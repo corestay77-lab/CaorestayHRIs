@@ -2,6 +2,11 @@
 
 Aturan: setiap update menaikkan versi di `lib/version.ts` dan `package.json`, lalu dicatat di sini.
 
+## 0.7.0
+- **Daftar Bulanan dirombak:** input memakai "kuas" (pilih Pagi / Siang / Malam / Libur / Sakit / Izin / Cuti / Alpa / Hapus, lalu klik atau geser tanggal), tombol Isi satu bulan per karyawan, dan Libur tiap Minggu. Tab departemen dengan jumlah karyawan; departemen kosong tidak lagi jadi pilihan awal.
+- **Sinkron dengan absensi:** sel menampilkan hasil scan (titik hijau tepat waktu, kuning telat, biru belum pulang, merah lupa pulang), alpa otomatis (merah bergaris), dan hadir tanpa jadwal (Hdr). Kolom H/T/S/I/C/A di kanan memakai perhitungan yang sama dengan Rekap & Payroll. Hari ini dan akhir pekan diberi warna.
+- API baru untuk mengisi banyak tanggal sekaligus (PUT /api/att) sehingga mengisi satu bulan tidak lambat.
+
 ## 0.6.1
 - **Absen sinkron dengan Pengaturan → Shift Kerja.** Dulu karyawan tanpa jadwal selalu dihitung dari jam masuk default hotel (08:00), tidak peduli shift Pagi/Siang/Malam. Sekarang: ada jadwal → pakai jadwal; tanpa jadwal → shift otomatis = shift yang jam mulainya paling dekat dengan jam absen (tertulis "(otomatis)"); belum ada shift sama sekali → jam default hotel. Telat dan lembur dihitung dari shift itu.
 - Shift malam yang melewati tengah malam: absen setelah 00:00 dicatat ke tanggal kerja shift tersebut (telat dihitung dari 23:00 hari sebelumnya).
