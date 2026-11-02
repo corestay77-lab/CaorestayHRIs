@@ -1,6 +1,6 @@
 'use client';
 import { useSyncExternalStore } from 'react';
-import { DB, Att, EMPTY, normalize } from './payroll';
+import { DB, Att, EMPTY, normalize, nextCode } from './payroll';
 import { monthAdd } from './geo';
 // Sumber data = database Vercel (Neon) lewat /api. Data HRD (karyawan, gaji, hotel, jadwal, dll.) satu dokumen;
 // absensi ada di tabel sendiri dan ikut dimuat ke db.att supaya Rekap & Payroll membacanya dengan cara yang sama.
@@ -56,4 +56,4 @@ export function useDB(){
 }
 export const uid=()=>crypto.randomUUID();
 export const newToken=()=>Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b=>b.toString(16).padStart(2,'0')).join('');
-export function assignCode(d:DB):[string,DB]{const s=d.settings;return[`${s.empPrefix}-${String(s.empNext).padStart(s.empDigits,'0')}`,{...d,settings:{...s,empNext:s.empNext+1}}]}
+export function assignCode(d:DB,dept:string):[string,DB]{return[nextCode(d,dept),d]}

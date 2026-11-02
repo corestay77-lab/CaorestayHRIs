@@ -1,6 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 import { useEffect, useRef, useState } from 'react';
+import { fmtDur } from '@/lib/geo';
 // Halaman karyawan: scan QR hotel → ID + PIN → satu tombol Absen.
 // Lokasi (akurasi + radius) dan selfie hanya dipakai untuk validasi. Foto TIDAK disimpan; yang tercatat hanya jam, jarak, dan akurasi.
 type St={name:string;code:string;hotel:string;shift:string;clock_in:string|null;clock_out:string|null;kind:'in'|'out'|'done';maxAcc:number;soft?:boolean;tz:string;tzLabel:string};
@@ -50,7 +51,7 @@ export default function Absen(){
     const s=await selfie();if(!s.img){say(s.why!);setBusy(false);return}
     try{const r=await post({op:'clock',code,pin,q:qr,...(pos?{lat:pos.coords.latitude,lng:pos.coords.longitude,acc:pos.coords.accuracy}:{}),selfie:s.img});
       if(!r.ok)say(r.error);else{
-        say(r.kind==='in'?`Absen masuk berhasil pukul ${r.time} ${r.tzLabel}${r.lateMin>0?` · terlambat ${r.lateMin} menit`:''}. Tercatat di rekap.${r.warn?` (lokasi ditandai untuk dicek HRD: ${r.warn})`:''}`:`Absen pulang berhasil pukul ${r.time} ${r.tzLabel} · ${r.hours} jam kerja${r.ot>0?` · lembur ${r.ot} jam`:''}. Tercatat di rekap.${r.warn?` (lokasi ditandai untuk dicek HRD: ${r.warn})`:''}`,true);
+        say(r.kind==='in'?`Absen masuk berhasil pukul ${r.time} ${r.tzLabel}${r.lateMin>0?` · terlambat ${fmtDur(r.lateMin)}`:''}. Tercatat di rekap.${r.warn?` (lokasi ditandai untuk dicek HRD: ${r.warn})`:''}`:`Absen pulang berhasil pukul ${r.time} ${r.tzLabel} · ${r.hours} jam kerja${r.ot>0?` · lembur ${r.ot} jam`:''}. Tercatat di rekap.${r.warn?` (lokasi ditandai untuk dicek HRD: ${r.warn})`:''}`,true);
         stopCam();stopGps();setPos(null);const n=await post({op:'status',code,pin,q:qr});if(n.ok)setSt(n)}
     }catch{say('Tidak bisa terhubung ke server.')}setBusy(false)};
   const card:React.CSSProperties={background:'#fff',borderRadius:18,padding:18,boxShadow:'0 10px 30px -12px rgba(18,52,140,.3)',marginBottom:12};

@@ -2,6 +2,11 @@
 
 Aturan: setiap update menaikkan versi di `lib/version.ts` dan `package.json`, lalu dicatat di sini.
 
+## 0.6.0
+- **ID karyawan = kode departemen + urutan** di departemen itu (FO-0001, FO-0002, HK-0001, …). Kode standar mengikuti Master Payroll (FO, HK, FB, MOD, AG, FN, HR, SEC, ENG, POMEC, SM); departemen lain memakai singkatan nama; kode bisa diubah di Pengaturan → Penomoran ID Karyawan. Ada tombol opsional **Nomori ulang semua ID sesuai departemen** (ID yang sudah ada tidak berubah otomatis).
+- **Keterlambatan ditampilkan dalam jam dan menit** (683 menit → "11 jam 23 mnt") di Absensi (Harian, Rekap, CSV), Payroll, slip, dan halaman absen karyawan.
+- Absensi → Harian: kolom **Jadwal masuk** (shift atau jam default hotel) agar terlihat dasar perhitungan telat.
+
 ## 0.5.0
 - Payroll: bagian **Rekap absensi → Payroll** (otomatis dari absensi periode berjalan): hadir, telat, sakit/izin/cuti, alpa, jam kerja, lembur (Rp masuk ke Pembayaran), saran potongan, potongan terisi. Tombol **Pakai saran** per karyawan dan **Isi saran potongan (yang kosong)**; potongan tetap dikonfirmasi HRD. Peringatan untuk absen belum pulang dan alpa dari jadwal tanpa scan.
 - Payroll: **Preview Laporan Salary** per departemen (subtotal + grand total, filter hotel, kolom tanda tangan) dengan **Cetak / Simpan PDF** (A4 landscape lewat dialog cetak browser).

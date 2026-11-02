@@ -10,10 +10,10 @@ export type User={id:string;name:string;email:string;role:string;active:boolean}
 // Satu baris Master Payroll = satu POSISI dengan jumlah staf (identik dengan menu Master Payroll di Hotel Budget). Angka per orang.
 export type MasterRow={id:string;hotel:string;dept:string;position:string;headcount:number;basic:number;medical:number;meal:number;ptkp:number;insurance:number;other:number};
 export type Comp={id:string;name:string;type:'Tunjangan'|'Potongan';amount:number;bpjs:boolean};
-export type Settings={company:string;companyId:string;npwp:string;address:string;phone:string;email:string;empPrefix:string;empDigits:number;empNext:number;radius:number;shift:string;tol:number;maxAcc:number;lateCut:number;geoMode:'strict'|'soft';tz:string;jsCo:number;jsEmp:number;otDiv:number;otRate1:number;otRate2:number;otMax:number;alpaDiv:number;comps:Comp[];activeUser:string;users:User[]};
+export type Settings={company:string;companyId:string;npwp:string;address:string;phone:string;email:string;empPrefix:string;empDigits:number;empNext:number;deptCodes:Record<string,string>;radius:number;shift:string;tol:number;maxAcc:number;lateCut:number;geoMode:'strict'|'soft';tz:string;jsCo:number;jsEmp:number;otDiv:number;otRate1:number;otRate2:number;otMax:number;alpaDiv:number;comps:Comp[];activeUser:string;users:User[]};
 export type PStatus='draft'|'submitted'|'approved'|'locked';
 export type DB={hotels:string[];depts:string[];emps:Emp[];att:Att[];corr:Corr[];geo:Record<string,Geo>;shifts:Shift[];sched:Sched[];closed:Record<string,boolean>;budget:Record<string,number>;periods:Record<string,PStatus>;period:string;audit:{t:string;m:string;u?:string}[];snap:Record<string,Record<string,any>>;settings:Settings;master:MasterRow[];cuts:Record<string,Record<string,number>>;lastSync:string|null};
-export const EMPTY:DB={hotels:[],depts:['Front Office','Housekeeping','F&B','Engineering','Sales & Marketing','Finance','HR'],emps:[],att:[],corr:[],geo:{},shifts:[{name:'Pagi',start:'07:00',end:'15:00'},{name:'Siang',start:'15:00',end:'23:00'},{name:'Malam',start:'23:00',end:'07:00'}],sched:[],closed:{},budget:{},periods:{},period:new Date().toISOString().slice(0,7),audit:[],snap:{},settings:{company:'CoreStay Advisory',companyId:'CSA-001',npwp:'',address:'',phone:'',email:'',empPrefix:'EMP',empDigits:4,empNext:1,radius:100,shift:'08:00',tol:0,maxAcc:100,lateCut:0,geoMode:'strict',tz:DEFAULT_TZ,jsCo:4.89,jsEmp:2,otDiv:173,otRate1:1.5,otRate2:2,otMax:4,alpaDiv:26,comps:[],activeUser:'USR-001',users:[{id:'USR-001',name:'HR Manager',email:'',role:'Admin',active:true}]},master:[],cuts:{},lastSync:null};
+export const EMPTY:DB={hotels:[],depts:['Front Office','Housekeeping','F&B','Engineering','Sales & Marketing','Finance','HR'],emps:[],att:[],corr:[],geo:{},shifts:[{name:'Pagi',start:'07:00',end:'15:00'},{name:'Siang',start:'15:00',end:'23:00'},{name:'Malam',start:'23:00',end:'07:00'}],sched:[],closed:{},budget:{},periods:{},period:new Date().toISOString().slice(0,7),audit:[],snap:{},settings:{company:'CoreStay Advisory',companyId:'CSA-001',npwp:'',address:'',phone:'',email:'',empPrefix:'EMP',empDigits:4,empNext:1,deptCodes:{},radius:100,shift:'08:00',tol:0,maxAcc:100,lateCut:0,geoMode:'strict',tz:DEFAULT_TZ,jsCo:4.89,jsEmp:2,otDiv:173,otRate1:1.5,otRate2:2,otMax:4,alpaDiv:26,comps:[],activeUser:'USR-001',users:[{id:'USR-001',name:'HR Manager',email:'',role:'Admin',active:true}]},master:[],cuts:{},lastSync:null};
 // Gabungkan data (mis. dari backup versi lama) dengan nilai default agar field baru selalu ada.
 export const normalize=(j:any):DB=>({...EMPTY,...j,settings:{...EMPTY.settings,...(j?.settings||{})}});
 // PTKP per tahun (TK = tidak kawin, K = kawin; angka = tanggungan). Dipakai sebagai saran pengisian kolom PTKP / tahun.
@@ -38,6 +38,13 @@ export const deptCode=(t:string)=>{const x=nz(t);return Object.keys(DEPT_ALIASES
 // nama departemen HR untuk sebuah kode Master Payroll (memakai yang sudah ada; kalau belum ada, nama standar)
 export const hrDept=(db:DB,code:string)=>db.depts.find(d=>deptCode(d)===code)||MASTER_DEPTS.find(x=>x[0]===code)?.[1]||code;
 export const normKey=nz;
+// ID karyawan = KODE DEPARTEMEN + urutan di departemen itu (FO-0001, FO-0002, HK-0001, ...).
+// Kode: pengaturan manual (Pengaturan → Penomoran ID) → kode standar Master Payroll → singkatan nama departemen → awalan cadangan.
+export const deptPrefix=(db:DB,dept:string)=>{const o=(db.settings.deptCodes?.[dept]||'').trim().toUpperCase();if(o)return o;const c=deptCode(dept);if(c)return c;
+  const w=String(dept||'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').split(' ').filter(Boolean),g=w.length>1?w.map(x=>x[0]).join('').slice(0,5):(w[0]||'').slice(0,3);return g||db.settings.empPrefix||'EMP'};
+export const pad=(db:DB,n:number)=>String(n).padStart(db.settings.empDigits||4,'0');
+export const nextCode=(db:DB,dept:string)=>{const pre=deptPrefix(db,dept),re=new RegExp('^'+pre.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'-(\\d+)$','i');
+  return `${pre}-${pad(db,db.emps.reduce((m,e)=>{const x=re.exec(e.code||'');return x?Math.max(m,Number(x[1])):m},0)+1)}`};
 
 // MODEL BIAYA — rumus yang sama persis dengan Master Payroll di Hotel Budget (input per orang, hasil × jumlah staf):
 //  THR provisi = gaji pokok ÷ 12 · Jamsostek perusahaan/staf = % gaji pokok · gross = gaji + medical + makan + THR provisi

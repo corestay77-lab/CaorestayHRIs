@@ -18,3 +18,5 @@ export function nowIn(tz?:string,d=new Date()){
 export const addDays=(date:string,n:number)=>new Date(Date.parse(date+'T00:00:00Z')+n*864e5).toISOString().slice(0,10);
 // menit absolut sejak epoch untuk (tanggal, jam) — dipakai menghitung jam kerja lintas tengah malam
 export const absMin=(date:string,time:string)=>Date.parse(date+'T00:00:00Z')/60000+toMin(time);
+// 683 → "11 jam 23 mnt" (bukan menit semua)
+export const fmtDur=(m:number)=>{const n=Math.max(0,Math.round(Number(m)||0));if(!n)return '0 mnt';const h=Math.floor(n/60),mm=n%60;return h&&mm?`${h} jam ${mm} mnt`:h?`${h} jam`:`${mm} mnt`};

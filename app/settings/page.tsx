@@ -6,7 +6,7 @@ import HotelSetup from '@/components/HotelSetup';
 import DatabaseCard from '@/components/DatabaseCard';
 import { TZS } from '@/lib/geo';
 import { useDB, uid, assignCode, api, loadAll } from '@/lib/store';
-import { EMPTY, Settings, rp } from '@/lib/payroll';
+import { EMPTY, Settings, rp, deptPrefix, nextCode, pad } from '@/lib/payroll';
 const BASE_SHIFTS=['Pagi','Siang','Malam'];
 const ROLES:[string,string][]=[['Admin','Akses penuh, termasuk pengaturan dan buka kunci payroll'],['HRD','Karyawan, kompensasi, dan rekap absensi'],['Payroll','Proses payroll, koreksi, approval, dan lock'],['Manager','Melihat laporan dan labor cost'],['Viewer','Hanya melihat']];
 function Inp({label,v,onSave,type='text'}:{label:string;v:string|number;onSave:(s:string)=>void;type?:string}){
@@ -20,8 +20,9 @@ export default function SettingsPage(){
   const wipe=async()=>{if(prompt('Ini menghapus SEMUA data (karyawan, gaji, absensi, PIN). Download backup dulu. Ketik HAPUS untuk melanjutkan.')!=='HAPUS')return;
     try{await api('/api/backup',{method:'POST',body:JSON.stringify({app:'corestay-people',v:2,state:{...EMPTY,period:new Date().toISOString().slice(0,7)},att:[],pins:[]})});await loadAll()}catch(e:any){alert(e.message)}};
   const seed=()=>{update(d0=>{let d={...d0};const h='Hotel Contoh';d.hotels=d.hotels.includes(h)?d.hotels:[...d.hotels,h];
-    for(const [n,dp,b,a] of [['Contoh A','Front Office',6000000,1000000],['Contoh B','Housekeeping',5000000,500000],['Contoh C','F&B',5500000,750000]] as [string,string,number,number][]){const[code,d2]=assignCode(d);d={...d2,emps:[...d2.emps,{id:uid(),code,name:`${n} (contoh)`,hotel:h,dept:dp,position:'Staff',joinDate:'2025-01-01',status:'Aktif' as const,basic:b,allowance:a,deduction:0,thrFactor:0}]}}return d},'Isi data contoh')};
-  const preview=`${S.empPrefix}-${String(S.empNext).padStart(S.empDigits,'0')}`;
+    for(const [n,dp,b,a] of [['Contoh A','Front Office',6000000,1000000],['Contoh B','Housekeeping',5000000,500000],['Contoh C','F&B',5500000,750000]] as [string,string,number,number][]){const[code,d2]=assignCode(d,dp);d={...d2,emps:[...d2.emps,{id:uid(),code,name:`${n} (contoh)`,hotel:h,dept:dp,position:'Staff',joinDate:'2025-01-01',status:'Aktif' as const,basic:b,allowance:a,deduction:0,thrFactor:0}]}}return d},'Isi data contoh')};
+  const renumber=()=>{if(!confirm('Nomori ulang SEMUA ID karyawan sesuai kode departemen (FO-0001, HK-0001, ...)? Karyawan harus memakai ID baru saat absen (PIN tetap). Tidak bisa dibatalkan selain dengan Restore backup.'))return;
+    update(d=>{const n:Record<string,number>={};return {...d,emps:d.emps.map(e=>{const pre=deptPrefix(d,e.dept);n[pre]=(n[pre]||0)+1;return {...e,code:`${pre}-${pad(d,n[pre])}`}})}},'Nomori ulang ID karyawan sesuai departemen')};
   const setUser=(id:string,patch:object,m:string)=>update(d=>({...d,settings:{...d.settings,users:d.settings.users.map(u=>u.id===id?{...u,...patch}:u)}}),`Pengguna ${id}: ${m}`);
   return <Shell title="Pengaturan & Hak Akses" sub="Database & backup, hotel & QR absen, identitas perusahaan, penomoran ID, pengguna & peran, dan parameter absensi.">
     <DatabaseCard/><HotelSetup/>
@@ -29,9 +30,13 @@ export default function SettingsPage(){
       <Inp label="Nama perusahaan" v={S.company} onSave={sv('company','nama perusahaan')}/><Inp label="ID / kode perusahaan (tenant)" v={S.companyId} onSave={sv('companyId','ID perusahaan')}/>
       <Inp label="NPWP perusahaan" v={S.npwp} onSave={sv('npwp','NPWP')}/><Inp label="Telepon" v={S.phone} onSave={sv('phone','telepon')}/><Inp label="Email" type="email" v={S.email} onSave={sv('email','email')}/><Inp label="Alamat" v={S.address} onSave={sv('address','alamat')}/></div>
       <p className="muted">Nama dan ID perusahaan tampil di topbar, footer sidebar, dan slip gaji.</p></section>
-    <section className="card panel" style={{marginTop:12}}><h2>Penomoran ID Karyawan</h2><div style={grid}>
-      <Inp label="Awalan (prefix)" v={S.empPrefix} onSave={sv('empPrefix','prefix ID')}/><Inp label="Jumlah digit" type="number" v={S.empDigits} onSave={sv('empDigits','digit ID')}/><Inp label="Nomor berikutnya" type="number" v={S.empNext} onSave={sv('empNext','nomor berikutnya')}/></div>
-      <p>ID karyawan berikutnya: <span className="badge">{preview}</span> <span className="muted">Diberikan otomatis saat karyawan ditambahkan; ID yang sudah ada tidak berubah.</span></p></section>
+    <section className="card panel" style={{marginTop:12}}><h2>Penomoran ID Karyawan</h2>
+      <p className="muted">ID = <b>kode departemen</b> + <b>urutan karyawan</b> di departemen itu, contoh <span className="badge">FO-0001</span>, <span className="badge">FO-0002</span>, <span className="badge">HK-0001</span>. Diberikan otomatis saat karyawan ditambahkan; ID yang sudah ada tidak berubah (pindah departemen tidak mengganti ID).</p>
+      <div style={grid}><Inp label="Jumlah digit urutan" type="number" v={S.empDigits} onSave={sv('empDigits','digit ID')}/><Inp label="Awalan cadangan (departemen tanpa kode)" v={S.empPrefix} onSave={sv('empPrefix','prefix cadangan')}/></div>
+      <div className="table-wrap"><table><thead><tr><th>Departemen</th><th>Kode</th><th>ID berikutnya</th></tr></thead><tbody>
+        {db.depts.map(dp=><tr key={dp}><td>{dp}</td><td><input defaultValue={deptPrefix(db,dp)} key={dp+deptPrefix(db,dp)} maxLength={6} style={{width:90,textTransform:'uppercase'}} aria-label={`Kode ${dp}`} onBlur={e=>{const v=e.target.value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');if(v&&v!==deptPrefix(db,dp))update(d=>({...d,settings:{...d.settings,deptCodes:{...(d.settings.deptCodes||{}),[dp]:v}}}),`Kode departemen ${dp} → ${v}`)}}/></td><td><span className="badge">{nextCode(db,dp)}</span></td></tr>)}
+        {!db.depts.length&&<tr><td className="muted" colSpan={3}>Belum ada departemen.</td></tr>}</tbody></table></div>
+      <button className="button secondary" style={{marginTop:10}} disabled={!db.emps.length} onClick={renumber}>Nomori ulang semua ID sesuai departemen</button></section>
     <section className="card panel" style={{marginTop:12}}><h2>Pengguna & Hak Akses</h2>
       <Form fields={[{k:'id',label:'User ID',req:true},{k:'name',label:'Nama',req:true},{k:'email',label:'Email'},{k:'role',label:'Peran',type:'select',opts:ROLES.map(r=>[r[0],r[0]])}]} btn="Tambah pengguna"
         onAdd={v=>{const id=v.id.trim();if(S.users.some(u=>u.id===id))return alert('User ID sudah dipakai');update(d=>({...d,settings:{...d.settings,users:[...d.settings.users,{id,name:v.name.trim(),email:v.email||'',role:v.role||'Admin',active:true}]}}),`Tambah pengguna ${id}`)}}/>
