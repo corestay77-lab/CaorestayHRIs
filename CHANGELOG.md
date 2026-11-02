@@ -2,6 +2,15 @@
 
 Aturan: setiap update menaikkan versi di `lib/version.ts` dan `package.json`, lalu dicatat di sini.
 
+## 0.5.0
+- Payroll: bagian **Rekap absensi → Payroll** (otomatis dari absensi periode berjalan): hadir, telat, sakit/izin/cuti, alpa, jam kerja, lembur (Rp masuk ke Pembayaran), saran potongan, potongan terisi. Tombol **Pakai saran** per karyawan dan **Isi saran potongan (yang kosong)**; potongan tetap dikonfirmasi HRD. Peringatan untuk absen belum pulang dan alpa dari jadwal tanpa scan.
+- Payroll: **Preview Laporan Salary** per departemen (subtotal + grand total, filter hotel, kolom tanda tangan) dengan **Cetak / Simpan PDF** (A4 landscape lewat dialog cetak browser).
+- Perbaikan: tombol cetak slip gaji sebelumnya mencetak halaman kosong; kini mencetak slip saja.
+- Master Payroll Hotel Budget (file terbaru) identik dengan versi sebelumnya: tidak ada perubahan format.
+
+## 0.4.1
+- Payroll: tombol **Kosongkan isi Payroll** (konfirmasi ketik KOSONGKAN). Menghapus Master Payroll, gaji per karyawan, potongan manual, koreksi, komponen tambahan, serta status approval/kunci dan snapshot semua periode. Data karyawan, PIN, dan absensi tidak dihapus.
+
 ## 0.4.0
 - **Master Payroll** mengikuti menu Master Payroll di Hotel Budget: satu baris = satu posisi × jumlah staf (kolom "No. staf" = jumlah staf, tombol ▲▼ menambah/mengurangi), kode departemen sama (FO, HK, FB, MOD, AG, FN, HR, SEC, ENG, POMEC, SM), rumus identik (PKP dibulatkan ke bawah ribuan, biaya jabatan maks Rp 6 juta/tahun), GRAND TOTAL, filter hotel.
 - **Sinkronisasi dari Hotel Budget** (Pengaturan → Integrasi · Sync): impor file Draft (.json, lengkap dengan PTKP) atau Excel (.xlsx, sheet "Payroll & Expenses"). Ada pratinjau (Baru / Diperbarui / Sama), impor ulang tidak menggandakan baris, baris yang tidak ada di file tidak dihapus.
