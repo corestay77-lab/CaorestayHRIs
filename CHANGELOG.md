@@ -2,6 +2,12 @@
 
 Aturan: setiap update menaikkan versi di `lib/version.ts` dan `package.json`, lalu dicatat di sini.
 
+## 0.6.1
+- **Absen sinkron dengan Pengaturan → Shift Kerja.** Dulu karyawan tanpa jadwal selalu dihitung dari jam masuk default hotel (08:00), tidak peduli shift Pagi/Siang/Malam. Sekarang: ada jadwal → pakai jadwal; tanpa jadwal → shift otomatis = shift yang jam mulainya paling dekat dengan jam absen (tertulis "(otomatis)"); belum ada shift sama sekali → jam default hotel. Telat dan lembur dihitung dari shift itu.
+- Shift malam yang melewati tengah malam: absen setelah 00:00 dicatat ke tanggal kerja shift tersebut (telat dihitung dari 23:00 hari sebelumnya).
+- Shift yang dipakai tersimpan di setiap catatan absensi (kolom Jadwal masuk di Harian). Kolom baru `shift`, `shift_start` dibuat otomatis di database; tombol Buat/perbarui database juga membuatnya.
+- Absen ganda pada hari/shift yang sama kini ditolak dengan pesan jelas (sebelumnya diam-diam tidak tersimpan).
+
 ## 0.6.0
 - **ID karyawan = kode departemen + urutan** di departemen itu (FO-0001, FO-0002, HK-0001, …). Kode standar mengikuti Master Payroll (FO, HK, FB, MOD, AG, FN, HR, SEC, ENG, POMEC, SM); departemen lain memakai singkatan nama; kode bisa diubah di Pengaturan → Penomoran ID Karyawan. Ada tombol opsional **Nomori ulang semua ID sesuai departemen** (ID yang sudah ada tidak berubah otomatis).
 - **Keterlambatan ditampilkan dalam jam dan menit** (683 menit → "11 jam 23 mnt") di Absensi (Harian, Rekap, CSV), Payroll, slip, dan halaman absen karyawan.

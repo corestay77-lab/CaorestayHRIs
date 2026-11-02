@@ -21,10 +21,11 @@ export async function POST(req:Request){
     else return json({error:'File backup tidak dikenali'},400);
     state.geo=state.geo||{};for(const h of state.hotels||[]){state.geo[h]={lat:0,lng:0,radius:100,shift:'08:00',...(state.geo[h]||{})};if(!state.geo[h].qr)state.geo[h].qr=token()}
     delete state.att;
+    await q(`alter table hr_att add column if not exists shift text`);await q(`alter table hr_att add column if not exists shift_start text`);
     const ops:{text:string;params?:any[]}[]=[{text:`delete from hr_att`},{text:`delete from hr_pin`},{text:`update hr_state set data=$1::jsonb, version=version+1, updated_at=now() where id=1`,params:[JSON.stringify(state)]}];
     for(let i=0;i<att.length;i+=300){const ch=att.slice(i,i+300),ps:any[]=[];
-      const vals=ch.map((r,k)=>{ps.push(r.id,r.emp_id,r.work_date,r.status||'Hadir',r.clock_in??null,r.clock_out??null,Number(r.ot_hours)||0,Number(r.late_min)||0,r.hours??null,r.dist??null,r.acc??null,r.src||'manual',r.note??null);const o=k*13;return `(${Array.from({length:13},(_,c)=>'$'+(o+c+1)).join(',')})`}).join(',');
-      ops.push({text:`insert into hr_att(id,emp_id,work_date,status,clock_in,clock_out,ot_hours,late_min,hours,dist,acc,src,note) values ${vals} on conflict do nothing`,params:ps})}
+      const vals=ch.map((r,k)=>{ps.push(r.id,r.emp_id,r.work_date,r.status||'Hadir',r.clock_in??null,r.clock_out??null,Number(r.ot_hours)||0,Number(r.late_min)||0,r.hours??null,r.dist??null,r.acc??null,r.src||'manual',r.note??null,r.shift??null,r.shift_start??null);const o=k*15;return `(${Array.from({length:15},(_,c)=>'$'+(o+c+1)).join(',')})`}).join(',');
+      ops.push({text:`insert into hr_att(id,emp_id,work_date,status,clock_in,clock_out,ot_hours,late_min,hours,dist,acc,src,note,shift,shift_start) values ${vals} on conflict do nothing`,params:ps})}
     for(const p of pins)ops.push({text:`insert into hr_pin(emp_id,pin_hash) values($1,$2) on conflict (emp_id) do nothing`,params:[p.emp_id,p.pin_hash]});
     await tx(ops);return json({ok:true,emps:(state.emps||[]).length,att:att.length})}
   catch(e:any){return json({error:errMsg(e)},500)}}

@@ -17,9 +17,11 @@ const SCHEMA=[
  `create unique index if not exists hr_att_one_qr on hr_att(emp_id, work_date) where src='qr'`,
  `create table if not exists hr_pin(emp_id text primary key, pin_hash text not null, fails int not null default 0, locked_until timestamptz)`,
  `create table if not exists hr_auth(id int primary key, pass_hash text not null, secret text not null)`,
+ `alter table hr_att add column if not exists shift text`,
+ `alter table hr_att add column if not exists shift_start text`,
  `insert into hr_state(id,data) values(1,'{}'::jsonb) on conflict (id) do nothing`];
 // Aman dijalankan berulang kali (hanya membuat yang belum ada).
 export async function ensureSchema(){for(const s of SCHEMA)await q(s)}
-export type AttRow={id:string;emp_id:string;work_date:string;status:string;clock_in:string|null;clock_out:string|null;ot_hours:number;late_min:number;hours:number|null;dist:number|null;acc:number|null;src:string;note:string|null};
-export const toAtt=(r:AttRow)=>({id:r.id,empId:r.emp_id,date:r.work_date,status:r.status,in:r.clock_in||undefined,out:r.clock_out||undefined,otHours:r.ot_hours||0,lateMin:r.late_min||0,late:r.late_min>0,hours:r.hours??undefined,dist:r.dist??undefined,src:r.src,note:r.note||undefined});
+export type AttRow={id:string;emp_id:string;work_date:string;status:string;clock_in:string|null;clock_out:string|null;ot_hours:number;late_min:number;hours:number|null;dist:number|null;acc:number|null;src:string;note:string|null;shift?:string|null;shift_start?:string|null};
+export const toAtt=(r:AttRow)=>({id:r.id,empId:r.emp_id,date:r.work_date,status:r.status,in:r.clock_in||undefined,out:r.clock_out||undefined,otHours:r.ot_hours||0,lateMin:r.late_min||0,late:r.late_min>0,hours:r.hours??undefined,dist:r.dist??undefined,src:r.src,note:r.note||undefined,shift:r.shift||undefined,shiftStart:r.shift_start||undefined});
 export const periodLocked=async(date:string)=>{const r=await q<{s:string|null}>(`select data->'periods'->>$1 as s from hr_state where id=1`,[date.slice(0,7)]);return r[0]?.s==='locked'};
