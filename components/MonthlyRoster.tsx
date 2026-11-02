@@ -12,7 +12,7 @@ const col=(n:string)=>PAL[n]||PAL._,code=(n:string)=>n==='Hadir'?'Hdr':n.slice(0
 const WD=['M','S','S','R','K','J','S'];
 export default function MonthlyRoster(){
   const {db,update,locked}=useDB();
-  const [dept,setDept]=useState<string|null>(null),[hotel,setHotel]=useState(''),[brush,setBrush]=useState('Pagi'),[err,setErr]=useState('');
+  const [dept,setDept]=useState<string|null>(null),[hotel,setHotel]=useState(''),[brushSel,setBrush]=useState<string|null>(null),[err,setErr]=useState(''),[pending,setPending]=useState(0);
   const down=useRef(false),ptype=useRef('mouse');
   useEffect(()=>{const up=()=>{down.current=false};window.addEventListener('pointerup',up);return()=>window.removeEventListener('pointerup',up)},[]);
   const today=nowIn(db.settings.tz).date,[y,m]=db.period.split('-').map(Number),dim=new Date(Date.UTC(y,m,0)).getUTCDate();
@@ -25,6 +25,8 @@ export default function MonthlyRoster(){
   const depts=[...new Set([...db.depts,...db.emps.map(e=>e.dept)].filter(Boolean))],cnt=(d:string)=>act.filter(e=>e.dept===d).length;
   const dp=dept!==null?dept:(depts.find(d=>cnt(d)>0)??''),list=act.filter(e=>!dp||e.dept===dp);
   const brushes=[...db.shifts.map(s=>s.name),'Libur',...STAT];
+  // kuas awal = shift pertama (atau Libur); null = belum dipilih, '' = Hapus
+  const brush=brushSel!==null&&(brushSel===''||brushes.includes(brushSel))?brushSel:(brushes[0]||'');
   // satu sel: gabungan jadwal, input manual, dan hasil scan
   const cell=(e:Emp,d:string)=>{
     const at=idx.get(e.id+'|'+d)||[],manual=at.find(a=>a.src==='manual'&&a.status!=='Hadir'),scan=at.find(a=>a.src!=='manual'&&a.in),sc=sidx.get(e.id+'|'+d);
@@ -33,11 +35,11 @@ export default function MonthlyRoster(){
     const mark=scan?(scan.lateMin?'#d97706':!scan.out&&d<today?'#dc2626':!scan.out?'#2563eb':'#16a34a'):'';
     const tip=[`${e.name} · ${d}`,label&&(auto?'Alpa otomatis (terjadwal, belum ada scan)':label),scan&&`Scan ${scan.in}${scan.out?'–'+scan.out:' (belum pulang)'}${scan.lateMin?` · telat ${scan.lateMin} mnt`:''}`].filter(Boolean).join(' · ');
     return {label,auto,mark,tip,has:!!(manual||sc!==undefined)}};
-  const paint=(e:Emp,dates:string[],log?:string)=>{if(locked||!brush)return;setErr('');
+  const paint=(e:Emp,dates:string[],log?:string)=>{if(locked)return;setErr('');
     const isShift=brush==='Libur'||db.shifts.some(s=>s.name===brush),isStat=STAT.includes(brush);
     update(x=>({...x,sched:[...x.sched.filter(s=>!(s.empId===e.id&&dates.includes(s.date))),...(isShift?dates.map(date=>({id:uid(),empId:e.id,date,shift:brush})):[])]}));
     const hasManual=db.att.some(a=>a.empId===e.id&&dates.includes(a.date)&&a.src==='manual'&&a.status!=='Hadir');
-    if(isStat||hasManual)attCells(e.id,dates,isStat?brush:'',log).catch(x=>setErr(x.message))};
+    if(isStat||hasManual){setPending(n=>n+1);attCells(e.id,dates,isStat?brush:'',log).catch(x=>setErr(x.message)).finally(()=>setPending(n=>n-1))}};
   const fillRow=(e:Emp)=>{if(!confirm(`Isi semua tanggal ${month} untuk ${e.name} dengan "${brush}"? Isi yang ada diganti.`))return;paint(e,ds,`Daftar bulanan ${e.name} ${db.period}: isi semua ${brush}`)};
   const sundays=()=>{const t=ds.filter(d=>new Date(d+'T00:00:00Z').getUTCDay()===0);if(!confirm(`Isi Libur di setiap hari Minggu (${t.length} hari) untuk ${list.length} karyawan? Hanya sel yang masih kosong.`))return;
     update(x=>({...x,sched:[...x.sched,...list.flatMap(e=>t.filter(d=>!x.sched.some(s=>s.empId===e.id&&s.date===d)&&!x.att.some(a=>a.empId===e.id&&a.date===d)).map(date=>({id:uid(),empId:e.id,date,shift:'Libur'})))]}),`Libur tiap Minggu ${db.period}`)};
@@ -48,9 +50,9 @@ export default function MonthlyRoster(){
     <div role="tablist" aria-label="Departemen" style={{display:'flex',gap:6,flexWrap:'wrap',margin:'8px 0'}}>
       {[['','Semua',act.length] as [string,string,number],...depts.map(d=>[d,d,cnt(d)] as [string,string,number])].map(([v,l,n])=><button key={l} role="tab" aria-selected={dp===v} onClick={()=>setDept(v)} style={{padding:'6px 12px',borderRadius:10,border:'1px solid #dbe5f8',background:dp===v?'#0a2a7a':'#fff',color:dp===v?'#fff':n?'#0a2a7a':'#9aa8c7',fontWeight:600,fontSize:13,cursor:'pointer'}}>{l} <span style={{opacity:.7}}>({n})</span></button>)}</div>
     <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',padding:'10px 12px',background:'#f6f9ff',borderRadius:14,margin:'6px 0 10px'}}>
-      <b style={{fontSize:13}}>Kuas:</b>{brushes.map(b=><button key={b} style={chip(b,brush===b)} onClick={()=>setBrush(b)} title={db.shifts.find(s=>s.name===b)?`${b} ${db.shifts.find(s=>s.name===b)!.start}–${db.shifts.find(s=>s.name===b)!.end}`:b}>{b}{db.shifts.find(s=>s.name===b)?` ${db.shifts.find(s=>s.name===b)!.start}`:''}</button>)}
-      <button style={{...chip('_',brush==='')}} onClick={()=>setBrush('')}>🧹 Hapus</button>
-      <span style={{flex:1}}/><button className="button secondary" disabled={locked||!list.length} onClick={sundays}>Libur tiap Minggu</button></div>
+      <b style={{fontSize:13}}>Kuas:</b>{brushes.map(b=><button key={b} style={chip(b,brush===b)} aria-pressed={brush===b} onClick={()=>setBrush(b)} title={db.shifts.find(s=>s.name===b)?`${b} ${db.shifts.find(s=>s.name===b)!.start}–${db.shifts.find(s=>s.name===b)!.end}`:b}>{b}{db.shifts.find(s=>s.name===b)?` ${db.shifts.find(s=>s.name===b)!.start}`:''}</button>)}
+      <button style={{...chip('_',brush==='')}} aria-pressed={brush===''} title="Kuas penghapus: mengosongkan jadwal dan keterangan di tanggal yang diklik (hasil scan tidak ikut terhapus)" onClick={()=>setBrush('')}>🧹 Hapus</button>
+      <span className="muted" style={{fontSize:12}}>Aktif: <b>{brush===''?'Hapus':brush}</b></span><span style={{flex:1}}/>{pending>0&&<span className="badge wait" role="status">Menyimpan…</span>}<button className="button secondary" disabled={locked||!list.length} onClick={sundays}>Libur tiap Minggu</button></div>
     {err&&<p role="alert" className="badge bad" style={{whiteSpace:'normal',marginBottom:8}}>{err}</p>}
     <div className="table-wrap"><table style={{borderCollapse:'separate',borderSpacing:2}}><thead><tr>
       <th style={{position:'sticky',left:0,background:'#fff',zIndex:2,minWidth:170,textAlign:'left'}}>Karyawan</th>

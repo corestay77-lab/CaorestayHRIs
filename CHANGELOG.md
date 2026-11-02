@@ -2,6 +2,11 @@
 
 Aturan: setiap update menaikkan versi di `lib/version.ts` dan `package.json`, lalu dicatat di sini.
 
+## 0.7.1
+- Daftar Bulanan: **tombol 🧹 Hapus tidak berfungsi** (pengisian berhenti bila kuas kosong) — diperbaiki.
+- Kuas awal kini shift pertama yang ada (sebelumnya dikunci "Pagi", sehingga klik tidak berefek bila shift itu tidak ada). Tampilan "Aktif: …" dan penanda tombol terpilih.
+- Sakit/Izin/Cuti/Alpa langsung tampil di sel saat diklik (sebelumnya menunggu server), ada indikator "Menyimpan…", dan data dikembalikan bila server menolak.
+
 ## 0.7.0
 - **Daftar Bulanan dirombak:** input memakai "kuas" (pilih Pagi / Siang / Malam / Libur / Sakit / Izin / Cuti / Alpa / Hapus, lalu klik atau geser tanggal), tombol Isi satu bulan per karyawan, dan Libur tiap Minggu. Tab departemen dengan jumlah karyawan; departemen kosong tidak lagi jadi pilihan awal.
 - **Sinkron dengan absensi:** sel menampilkan hasil scan (titik hijau tepat waktu, kuning telat, biru belum pulang, merah lupa pulang), alpa otomatis (merah bergaris), dan hadir tanpa jadwal (Hdr). Kolom H/T/S/I/C/A di kanan memakai perhitungan yang sama dengan Rekap & Payroll. Hari ini dan akhir pekan diberi warna.
