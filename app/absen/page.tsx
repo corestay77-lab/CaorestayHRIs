@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { fmtDur } from '@/lib/geo';
 // Halaman karyawan: scan QR hotel → ID + PIN → satu tombol Absen.
 // Lokasi (akurasi + radius) dan selfie hanya dipakai untuk validasi. Foto TIDAK disimpan; yang tercatat hanya jam, jarak, dan akurasi.
-type St={name:string;code:string;hotel:string;shift:string;clock_in:string|null;clock_out:string|null;kind:'in'|'out'|'done';maxAcc:number;soft?:boolean;tz:string;tzLabel:string};
+type St={name:string;code:string;hotel:string;shift:string;clock_in:string|null;clock_out:string|null;kind:'in'|'out'|'done';maxAcc:number;soft?:boolean;tz:string;tzLabel:string;allowed:boolean;reason:string;strict:boolean;schedule:{name:string;start:string;end:string;opens?:string;auto?:boolean}|null};
 const post=async(b:object)=>{const r=await fetch('/api/absen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});return r.json()};
 export default function Absen(){
   const [code,setCode]=useState(''),[pin,setPin]=useState(''),[st,setSt]=useState<St|null>(null),[msg,setMsg]=useState<{t:string;ok:boolean}|null>(null),[busy,setBusy]=useState(false);
@@ -30,7 +30,7 @@ export default function Absen(){
   const openCam=async()=>{try{if(stream.current)stream.current.getTracks().forEach(t=>t.stop());const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});stream.current=s;setCam(true);return true}catch{setCam(false);say('Kamera tidak bisa diakses. Izinkan kamera di browser (alamat harus https).');return false}};
   useEffect(()=>{const v=vid.current;if(cam&&v&&stream.current&&v.srcObject!==stream.current){v.srcObject=stream.current;v.play().catch(()=>{})}},[cam,st]);
   const login=async()=>{setBusy(true);setMsg(null);
-    try{const r=await post({op:'status',code,pin,q:qr});if(!r.ok){setSt(null);say(r.error)}else{setSt(r);try{localStorage.setItem('cs-emp-code',code.toUpperCase())}catch{}if(r.kind!=='done'){locate(r.maxAcc);openCam()}}}catch{say('Tidak bisa terhubung ke server.')}setBusy(false)};
+    try{const r=await post({op:'status',code,pin,q:qr});if(!r.ok){setSt(null);say(r.error)}else{setSt(r);try{localStorage.setItem('cs-emp-code',code.toUpperCase())}catch{}if(r.kind!=='done'&&r.allowed){locate(r.maxAcc);openCam()}}}catch{say('Tidak bisa terhubung ke server.')}setBusy(false)};
   // Cek selfie di HP: kamera aktif, gambar tidak gelap/kosong, dan wajah terdeteksi bila browser mendukung. Hasilnya tidak disimpan.
   const selfie=async():Promise<{img?:string;why?:string}>=>{
     const v=vid.current;if(!v||!v.videoWidth)return{why:'Kamera belum siap.'};
@@ -43,6 +43,7 @@ export default function Absen(){
   useEffect(()=>{if(!st)return;const f=()=>setClock(new Intl.DateTimeFormat('id-ID',{timeZone:st.tz,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date()).replace('.',':'));f();const t=setInterval(f,15000);return()=>clearInterval(t)},[st?.tz]);
   const maxAcc=st?.maxAcc||100,accOk=!!pos&&pos.coords.accuracy<=maxAcc;
   const send=async()=>{if(!st||st.kind==='done')return;
+    if(!st.allowed){say(st.reason);return}
     if(!st.soft){
       if(!pos){say(locating?'Lokasi masih dicari, tunggu beberapa detik.':'Lokasi belum terbaca. Mencari lokasi lagi…');if(!locating)locate(maxAcc);return}
       if(!accOk){const a=Math.round(pos.coords.accuracy);say(a>500?`Lokasi masih kasar (±${a} m). Aktifkan Lokasi Presisi — lihat petunjuk kuning di bawah.`:`Akurasi GPS ±${a} m, perlu ≤ ${maxAcc} m. Tunggu beberapa detik sampai akurasi membaik, atau minta HRD menaikkan batas akurasi di Pengaturan.`);return}}
@@ -66,8 +67,11 @@ export default function Absen(){
       <button className="button" style={{width:'100%',padding:14}} disabled={busy||!code||!pin} onClick={login}>{busy?'Memeriksa…':'Lanjut'}</button></div>}
     {st&&<><div style={card}><div style={{fontWeight:800,fontSize:18}}>{st.name}</div><div className="muted">{st.code} · {st.hotel}</div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}><span className="badge">Jam hotel: {clock} {st.tzLabel}</span><span className="badge">Shift: {st.shift}</span><span className="badge">Masuk: {st.clock_in||'—'}</span><span className="badge">Pulang: {st.clock_out||'—'}</span></div></div>
+      {st.kind==='in'&&<div style={{...card,borderLeft:`5px solid ${st.allowed?'#13b8aa':'#ff3b5c'}`}}><div className="muted" style={{fontSize:12}}>JADWAL HARI INI</div>
+        {st.schedule?<div style={{fontSize:21,fontWeight:800,margin:'2px 0 6px'}}>{st.schedule.name} · {st.schedule.start}–{st.schedule.end}</div>:<div style={{fontSize:18,fontWeight:800,margin:'2px 0 6px'}}>Tidak ada jadwal</div>}
+        {st.allowed?<span className="badge ok">✓ Sesuai jadwal{st.schedule?.auto?' (otomatis)':''} — silakan absen</span>:<><p role="alert" style={{margin:'0 0 10px',fontWeight:600,color:'#b91c1c'}}>✕ {st.reason}</p><button className="button secondary" disabled={busy} onClick={login}>Cek lagi</button></>}</div>}
       {st.kind==='done'?<div className="badge ok" style={{display:'block',textAlign:'center',padding:12,marginBottom:12}}>Absensi hari ini selesai ✓</div>
-      :<div style={card}><video ref={vid} playsInline muted style={{width:'100%',borderRadius:14,display:cam?'block':'none',transform:'scaleX(-1)',marginBottom:10}}/>
+      :!st.allowed?null:<div style={card}><video ref={vid} playsInline muted style={{width:'100%',borderRadius:14,display:cam?'block':'none',transform:'scaleX(-1)',marginBottom:10}}/>
         <div style={{display:'flex',gap:8,marginBottom:10,fontSize:12,flexWrap:'wrap'}}>
           <span className={`badge ${accOk?'ok':'wait'}`}>{pos?`Lokasi ±${Math.round(pos.coords.accuracy)} m${accOk?'':` (perlu ≤ ${maxAcc} m)${locating?` · ${secs} dtk`:''}`}`:locating?`Mencari lokasi… ${secs} dtk`:'Lokasi belum siap'}</span>
           <span className={`badge ${cam?'ok':'wait'}`}>{cam?'Kamera siap':'Kamera belum siap'}</span></div>

@@ -19,7 +19,7 @@ Karyawan scan QR di pos security → `/absen` → ID + PIN → **Absen Masuk / P
 - **Selfie & lokasi hanya untuk validasi. Foto tidak disimpan** (hanya jam, jarak, dan akurasi GPS yang tercatat).
 - Hasil langsung masuk **Absensi → Rekap** (hadir, telat, sakit/izin/cuti, alpa, lembur). Tidak ada validasi/persetujuan/closing absensi.
 - **Payroll** membaca lembur dari rekap. **Potongan absensi (alpa/telat) diisi manual** oleh HRD di Payroll; Rekap hanya memberi saran angka.
-- Sakit/izin/cuti/koreksi: input manual di Absensi → Harian. Jadwal shift bersifat opsional (dipakai untuk shift, lembur, dan alpa otomatis).
+- Sakit/izin/cuti/koreksi: input manual di Absensi → Harian. **Jadwal bulanan (Absensi → Daftar Bulanan) jadi patokan absen**: karyawan hanya bisa absen masuk sesuai shift yang dijadwalkan (jadwal tampil langsung setelah login; Libur / belum dijadwalkan / di luar jam shift ditolak). Bisa dimatikan di Pengaturan. Alpa tidak otomatis: HRD menandainya sendiri.
 
 ## Master Payroll & sinkron dengan Hotel Budget
 **Payroll → Data karyawan dan perhitungan biaya** = Master Payroll yang sama dengan menu Master Payroll di Hotel Budget (posisi × jumlah staf).

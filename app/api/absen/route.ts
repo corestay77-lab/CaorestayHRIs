@@ -2,7 +2,7 @@
 import { q, dbConfigured } from '@/lib/db';
 import { verifySecret, json, errMsg } from '@/lib/auth';
 import { distM, nowIn, okTz, tzShort, addDays, absMin, toMin } from '@/lib/geo';
-import { validShifts, resolveShift, shiftForRow, shiftLabel } from '@/lib/shift';
+import { validShifts, shiftForRow, shiftLabel, planClockIn, Resolved } from '@/lib/shift';
 export const dynamic='force-dynamic';
 type Doc={emps:any[];geo:Record<string,any>;sched:any[];shifts:any[];settings:any;periods:Record<string,string>};
 const fail=(error:string,status=200)=>json({ok:false,error},status);
@@ -12,6 +12,14 @@ async function doc():Promise<Doc>{
 const hotelByQr=(d:Doc,t:string)=>t?Object.keys(d.geo).find(h=>d.geo[h]?.qr&&d.geo[h].qr===t):undefined;
 // Kolom shift untuk catatan absensi (dibuat otomatis sekali bila database lama belum punya).
 let cols=false;async function ensureCols(){if(cols)return;await q(`alter table hr_att add column if not exists shift text`);await q(`alter table hr_att add column if not exists shift_start text`);cols=true}
+// Gerbang absen masuk: jadwal bulanan sebagai patokan (kecuali mode 'off'), plus keterangan manual HRD (sakit/izin/cuti/alpa) hari itu.
+async function gate(d:Doc,empId:string,geo:any,n:{date:string;time:string}):Promise<{ok:boolean;reason:string;r?:Resolved;sch:{name:string;start:string;end:string;opens?:string;auto?:boolean}|null}>{
+  const strict=d.settings.schedMode!=='off',early=d.settings.inEarly===undefined?60:Math.max(0,Number(d.settings.inEarly)||0);
+  const pl=planClockIn(d.shifts,d.sched,empId,fb(d,geo),n,{strict,earlyMin:early});
+  if(!pl.ok)return {ok:false,reason:pl.reason,sch:pl.info||null};
+  if(strict){const mb=await q(`select status from hr_att where emp_id=$1 and work_date=$2 and src='manual' and status<>'Hadir' limit 1`,[empId,pl.r.workDate]);
+    if(mb.length)return {ok:false,reason:`Hari ini Anda tercatat ${mb[0].status} oleh HRD, jadi tidak bisa absen masuk. Hubungi HRD bila ini keliru.`,sch:{name:pl.r.name,start:pl.r.start,end:pl.r.end,opens:pl.opens}}}
+  return {ok:true,reason:'',r:pl.r,sch:{name:pl.r.name,start:pl.r.start,end:pl.r.end,opens:pl.opens,auto:pl.r.auto}}}
 const fb=(d:Doc,geo:any)=>String(geo?.shift||d.settings.shift||'08:00');
 export async function GET(req:Request){ // ?q=kode-QR → nama hotel (untuk ditampilkan setelah scan)
   if(!dbConfigured())return fail('Database belum dihubungkan.');
@@ -46,8 +54,9 @@ export async function POST(req:Request){
     await ensureCols();
     const tz=okTz(geo?.tz||d.settings.tz),tzl=tzShort(tz),p=await position(e.id,tz);
     if(b.op==='status'){
-      const sh=resolveShift(d.shifts,d.sched,e.id,fb(d,geo),p.n),row=p.open||p.today,lbl=row?.shift?`${row.shift} ${row.shift_start||''}`.trim():sh.name?`${shiftLabel(sh)} ${sh.start}–${sh.end}`:`mulai ${sh.start}`;
-      return json({ok:true,name:e.name,code:e.code,hotel,shift:lbl,clock_in:row?.clock_in||null,clock_out:p.today?.clock_out||null,kind:p.kind,maxAcc,tz,tzLabel:tzl,soft:d.settings.geoMode==='soft'})}
+      const row=p.open||p.today,g=p.kind==='in'?await gate(d,e.id,geo,p.n):null,sch=g?.sch||null;
+      const lbl=row?.shift?`${row.shift} ${row.shift_start||''}`.trim():sch?.name?`${sch.name}${sch.auto?' (otomatis)':''} ${sch.start}–${sch.end}`:g&&!g.ok?'tidak ada jadwal':'—';
+      return json({ok:true,name:e.name,code:e.code,hotel,shift:lbl,clock_in:row?.clock_in||null,clock_out:p.today?.clock_out||null,kind:p.kind,maxAcc,tz,tzLabel:tzl,soft:d.settings.geoMode==='soft',allowed:g?g.ok:true,reason:g?.reason||'',schedule:sch,strict:d.settings.schedMode!=='off'})}
     if(b.op!=='clock')return fail('Permintaan tidak dikenal');
     if(p.kind==='done')return fail('Absensi hari ini sudah selesai.');
     // — validasi lokasi & selfie —
@@ -62,7 +71,7 @@ export async function POST(req:Request){
     if(!selfieOk(b.selfie))return fail('Selfie dari kamera diperlukan untuk absen.');
     if(d.periods[p.n.date.slice(0,7)]==='locked')return fail('Payroll periode ini sudah dikunci. Hubungi HRD.');
     if(p.kind==='in'){
-      const sh=resolveShift(d.shifts,d.sched,e.id,fb(d,geo),p.n),late=Math.max(0,absMin(p.n.date,p.n.time)-absMin(sh.workDate,sh.start)-(Number(d.settings.tol)||0));
+      const g=await gate(d,e.id,geo,p.n);if(!g.ok)return fail(g.reason);const sh=g.r!,late=Math.max(0,absMin(p.n.date,p.n.time)-absMin(sh.workDate,sh.start)-(Number(d.settings.tol)||0));
       const ins=await q(`insert into hr_att(id,emp_id,work_date,status,clock_in,late_min,dist,acc,src,note,shift,shift_start) values($1,$2,$3,'Hadir',$4,$5,$6,$7,'qr',$8,$9,$10) on conflict do nothing returning id`,[crypto.randomUUID(),e.id,sh.workDate,p.n.time,late,dist,accR,warn?'⚠ '+warn:null,shiftLabel(sh)||null,sh.start]);
       if(!ins.length)return fail('Absensi untuk hari/shift ini sudah tercatat.');
       return json({ok:true,kind:'in',tzLabel:tzl,time:p.n.time,lateMin:late,shift:`${shiftLabel(sh)} ${sh.start}`.trim(),warn})}

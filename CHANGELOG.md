@@ -2,6 +2,11 @@
 
 Aturan: setiap update menaikkan versi di `lib/version.ts` dan `package.json`, lalu dicatat di sini.
 
+## 0.8.0
+- **Jadwal bulanan jadi patokan absen.** Setelah login di halaman absen, jadwal hari itu langsung tampil (shift + jam). Absen masuk **ditolak** bila: belum dijadwalkan, jadwal Libur, HRD sudah mencatat Sakit/Izin/Cuti/Alpa hari itu, shift belum dibuka (default 60 menit sebelum mulai), atau shift sudah berakhir. Pemeriksaan dilakukan di server; kamera/GPS baru dinyalakan bila boleh absen. Absen pulang tidak dibatasi. Shift malam melewati tengah malam tetap dikenali.
+- Pengaturan baru: **Absen wajib sesuai jadwal** (Ya/Tidak; Tidak = shift otomatis dari jam absen seperti 0.6.1) dan **Absen masuk dibuka (menit sebelum shift)**.
+- **Alpa tidak lagi otomatis.** Hari terjadwal tanpa scan hanya diberi penanda (cincin kuning di Daftar Bulanan, "tanpa scan" di Rekap/Payroll); Alpa hanya dari input HRD. Tombol baru **Tandai tanpa scan → Alpa** (dengan konfirmasi) untuk menandai sekaligus secara manual.
+
 ## 0.7.1
 - Daftar Bulanan: **tombol 🧹 Hapus tidak berfungsi** (pengisian berhenti bila kuas kosong) — diperbaiki.
 - Kuas awal kini shift pertama yang ada (sebelumnya dikunci "Pagi", sehingga klik tidak berefek bila shift itu tidak ada). Tampilan "Aktif: …" dan penanda tombol terpilih.
