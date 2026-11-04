@@ -2,6 +2,10 @@
 
 Aturan: setiap update menaikkan versi di `lib/version.ts` dan `package.json`, lalu dicatat di sini.
 
+## 0.8.3
+- **Payroll: tabel karyawan otomatis.** Tabel "Data karyawan dan perhitungan biaya" kini berisi semua karyawan aktif dari Employee Master (muncul langsung setelah nama dimasukkan, juga lewat kolom **Nama karyawan baru** di halaman Payroll) dengan kolom model biaya lengkap dan GRAND TOTAL. Angka terhitung **langsung saat mengetik** (sebelumnya baru setelah kolom ditinggalkan).
+- Tabel posisi dari Hotel Budget dipindah ke bagian bawah sebagai **Master Payroll — anggaran posisi**; isiannya juga langsung terhitung. Bagian "Gaji karyawan (input manual)" digabung ke tabel karyawan (termasuk komponen tambahan per karyawan).
+
 ## 0.8.2
 - Dihapus: menu dan halaman **Compensation Master**. Isian gaji per karyawan (gaji pokok, medical, makan, PTKP, asuransi, biaya lain, dan nominal komponen tambahan) dipindah ke halaman **Payroll → Gaji karyawan (input manual)**; fungsinya sama, tidak ada data yang hilang.
 
