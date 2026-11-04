@@ -1,5 +1,5 @@
 import { nowIn, okTz, DEFAULT_TZ } from './geo';
-export type Emp={id:string;code?:string;name:string;hotel:string;dept:string;position:string;joinDate:string;status:'Aktif'|'Nonaktif';basic:number;allowance:number;deduction:number;thrFactor:number;comps?:Record<string,number>;posId?:string;medical?:number;meal?:number;ptkp?:number;insurance?:number;otherCost?:number};
+export type Emp={id:string;code?:string;name:string;hotel:string;dept:string;position:string;joinDate:string;status:'Aktif'|'Nonaktif';basic:number;allowance:number;deduction:number;thrFactor:number;comps?:Record<string,number>;medical?:number;meal?:number;ptkp?:number;insurance?:number;otherCost?:number};
 // Satu baris absensi. Karyawan yang scan QR tercatat otomatis (src 'qr'); sakit/izin/cuti/koreksi diinput HRD (src 'manual').
 export type Att={id:string;empId:string;date:string;status:'Hadir'|'Sakit'|'Izin'|'Alpa'|'Cuti';otHours:number;src?:'manual'|'qr'|'selfie';in?:string;out?:string;dist?:number;late?:boolean;lateMin?:number;hours?:number;note?:string;shift?:string;shiftStart?:string};
 export type Shift={name:string;start:string;end:string};
@@ -60,9 +60,8 @@ export function costModel(x:PayIn,count:number,S:{jsCo:number;jsEmp:number}){
   const gross=T.basic+T.medical+T.meal+T.thr,ins=insurance*c,oth=other*c;
   return {count:c,hasPtkp,...T,gross,ptkp:ptkp*c,jabatan:jobAnnual/12*c,pkpM:pkpY/12*c,pkpY:pkpY*c,pphY:pphY*c,pphM:pphY/12*c,insurance:ins,other:oth,total:gross+T.jsCo+ins+oth};
 }
-// Gaji karyawan: nilainya sendiri bila diisi, kalau kosong mengikuti Master Payroll posisinya.
-export const payInOf=(e:Emp,db:DB):PayIn=>{const m=e.posId?db.master?.find(x=>x.id===e.posId):undefined,pick=(own?:number,fb?:number)=>(Number(own)||0)>0?Number(own):Number(fb)||0;
-  return {basic:pick(e.basic,m?.basic),medical:pick(e.medical,m?.medical),meal:pick(e.meal,m?.meal),ptkp:pick(e.ptkp,m?.ptkp),insurance:pick(e.insurance,m?.insurance),other:pick(e.otherCost,m?.other)}};
+// Gaji karyawan = nilai yang diisi di Compensation Master (kolom kosong = 0).
+export const payInOf=(e:Emp,_db?:DB):PayIn=>({basic:e.basic,medical:e.medical,meal:e.meal,ptkp:e.ptkp,insurance:e.insurance,other:e.otherCost});
 export function compute(e:Emp,db:DB){
   const r=recap(e.id,db),p=db.period,S=db.settings,{otHours,lateMin,hours,alpa}=r;
   const cm=costModel(payInOf(e,db),1,S),{basic,medical,meal,thr:thrProv,jsCo,jsEmp,gross,ptkp,jabatan,pkpM,pkpY,pphY,pphM,insurance,other,total}=cm;

@@ -2,6 +2,9 @@
 
 Aturan: setiap update menaikkan versi di `lib/version.ts` dan `package.json`, lalu dicatat di sini.
 
+## 0.8.1
+- Dihapus: **Posisi Master Payroll** di Employee Master (kolom, isian saat tambah karyawan, dan penghitung "terisi X/N"). Master Payroll kini berdiri sendiri sebagai model biaya per posisi (sinkron dengan Hotel Budget); gaji tiap karyawan hanya dari Compensation Master. Kaitan posisi lama pada data karyawan diabaikan.
+
 ## 0.8.0
 - **Jadwal bulanan jadi patokan absen.** Setelah login di halaman absen, jadwal hari itu langsung tampil (shift + jam). Absen masuk **ditolak** bila: belum dijadwalkan, jadwal Libur, HRD sudah mencatat Sakit/Izin/Cuti/Alpa hari itu, shift belum dibuka (default 60 menit sebelum mulai), atau shift sudah berakhir. Pemeriksaan dilakukan di server; kamera/GPS baru dinyalakan bila boleh absen. Absen pulang tidak dibatasi. Shift malam melewati tengah malam tetap dikenali.
 - Pengaturan baru: **Absen wajib sesuai jadwal** (Ya/Tidak; Tidak = shift otomatis dari jam absen seperti 0.6.1) dan **Absen masuk dibuka (menit sebelum shift)**.
