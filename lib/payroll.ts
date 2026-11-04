@@ -60,7 +60,7 @@ export function costModel(x:PayIn,count:number,S:{jsCo:number;jsEmp:number}){
   const gross=T.basic+T.medical+T.meal+T.thr,ins=insurance*c,oth=other*c;
   return {count:c,hasPtkp,...T,gross,ptkp:ptkp*c,jabatan:jobAnnual/12*c,pkpM:pkpY/12*c,pkpY:pkpY*c,pphY:pphY*c,pphM:pphY/12*c,insurance:ins,other:oth,total:gross+T.jsCo+ins+oth};
 }
-// Gaji karyawan = nilai yang diisi di Compensation Master (kolom kosong = 0).
+// Gaji karyawan = nilai yang diisi di menu Payroll → Gaji karyawan (kolom kosong = 0).
 export const payInOf=(e:Emp,_db?:DB):PayIn=>({basic:e.basic,medical:e.medical,meal:e.meal,ptkp:e.ptkp,insurance:e.insurance,other:e.otherCost});
 export function compute(e:Emp,db:DB){
   const r=recap(e.id,db),p=db.period,S=db.settings,{otHours,lateMin,hours,alpa}=r;

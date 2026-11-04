@@ -24,7 +24,7 @@ Karyawan scan QR di pos security → `/absen` → ID + PIN → **Absen Masuk / P
 ## Master Payroll & sinkron dengan Hotel Budget
 **Payroll → Data karyawan dan perhitungan biaya** = Master Payroll yang sama dengan menu Master Payroll di Hotel Budget (posisi × jumlah staf).
 Untuk menyinkronkan: di Hotel Budget unduh **Draft (.json)** atau **Excel (.xlsx)**, lalu buka **Pengaturan → Integrasi · CoreStay Sync → Sinkronisasi Master Payroll**, pilih file, cek pratinjau, **Terapkan**. Impor ulang memperbarui baris yang sama, tidak menggandakan.
-Master Payroll adalah model biaya per posisi; gaji tiap karyawan diisi di **Compensation Master**. Setelah mengganti `package.json`, jalankan `npm install` (ada paket baru `xlsx`).
+Master Payroll adalah model biaya per posisi; gaji tiap karyawan diisi di **Payroll → Gaji karyawan**. Setelah mengganti `package.json`, jalankan `npm install` (ada paket baru `xlsx`).
 
 ## Backup
 **Pengaturan → Database & Backup**: Buat/perbarui database, **Download backup**, **Restore backup** (mengganti seluruh data; menerima juga file backup lama dari versi yang menyimpan data di browser).

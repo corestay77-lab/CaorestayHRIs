@@ -2,6 +2,9 @@
 
 Aturan: setiap update menaikkan versi di `lib/version.ts` dan `package.json`, lalu dicatat di sini.
 
+## 0.8.2
+- Dihapus: menu dan halaman **Compensation Master**. Isian gaji per karyawan (gaji pokok, medical, makan, PTKP, asuransi, biaya lain, dan nominal komponen tambahan) dipindah ke halaman **Payroll → Gaji karyawan (input manual)**; fungsinya sama, tidak ada data yang hilang.
+
 ## 0.8.1
 - Dihapus: **Posisi Master Payroll** di Employee Master (kolom, isian saat tambah karyawan, dan penghitung "terisi X/N"). Master Payroll kini berdiri sendiri sebagai model biaya per posisi (sinkron dengan Hotel Budget); gaji tiap karyawan hanya dari Compensation Master. Kaitan posisi lama pada data karyawan diabaikan.
 

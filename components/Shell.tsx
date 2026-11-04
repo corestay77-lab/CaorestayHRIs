@@ -11,7 +11,7 @@ import { nowIn } from '@/lib/geo';
 // Sidebar diringkas: menu yang saling berkaitan digabung, halaman di dalamnya tampil sebagai tab.
 export const groups=[
   {label:'Dashboard',icon:LayoutDashboard,tabs:[['Dashboard','/']]},
-  {label:'Karyawan',icon:ContactRound,tabs:[['Employee Master','/employees'],['Compensation Master','/compensation'],['Organisasi & Hotel','/organization']]},
+  {label:'Karyawan',icon:ContactRound,tabs:[['Employee Master','/employees'],['Organisasi & Hotel','/organization']]},
   {label:'Absensi',icon:CalendarCheck,tabs:[['Rekap Absensi','/attendance']]},
   {label:'Payroll',icon:Wallet,tabs:[['Payroll Processing','/payroll'],['Approval & Payroll Lock','/approval'],['Payroll Correction','/correction']]},
   {label:'Laporan & Audit',icon:ChartNoAxesCombined,tabs:[['Labor Cost Control','/labor-cost'],['Audit Log','/audit']]},
