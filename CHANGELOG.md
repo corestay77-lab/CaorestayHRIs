@@ -2,6 +2,13 @@
 
 Aturan: setiap update menaikkan versi di `lib/version.ts` dan `package.json`, lalu dicatat di sini.
 
+## 0.9.0
+- **Multi-hotel, satu database, data terpisah per hotel.** Tiap hotel punya dokumen data sendiri (karyawan, jadwal, payroll, Master Payroll, pengaturan, QR absen) di tabel `hr_hotel`; absensi dan PIN ditandai `hotel_id`. Login hotel hanya melihat hotelnya; server menolak akses ke hotel lain.
+- **Akun:** username + password. **Admin pusat** melihat semua hotel (pemilih hotel di bagian atas), mendaftarkan hotel baru + login-nya, reset login, dan backup/restore. Halaman baru **Semua Hotel & Login** berisi ringkasan semua hotel.
+- QR absen kini per hotel dan hanya mengenali karyawan hotel itu. Penguncian payroll per hotel.
+- **Upgrade otomatis** dari versi lama: tombol **Perbarui database** memecah data lama per hotel, mengisi `hotel_id`, dan menjadikan password lama login `admin`. Backup versi lama bisa direstore (dipecah per hotel).
+- Dihapus dari Pengaturan: Daftar Hotel Awal dan tambah hotel di Organisasi (diganti Semua Hotel & Login). "Reset semua data" menjadi "Reset data hotel ini".
+
 ## 0.8.3
 - **Payroll: tabel karyawan otomatis.** Tabel "Data karyawan dan perhitungan biaya" kini berisi semua karyawan aktif dari Employee Master (muncul langsung setelah nama dimasukkan, juga lewat kolom **Nama karyawan baru** di halaman Payroll) dengan kolom model biaya lengkap dan GRAND TOTAL. Angka terhitung **langsung saat mengetik** (sebelumnya baru setelah kolom ditinggalkan).
 - Tabel posisi dari Hotel Budget dipindah ke bagian bawah sebagai **Master Payroll — anggaran posisi**; isiannya juga langsung terhitung. Bagian "Gaji karyawan (input manual)" digabung ke tabel karyawan (termasuk komponen tambahan per karyawan).

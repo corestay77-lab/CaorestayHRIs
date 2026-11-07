@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { api, loadAll } from '@/lib/store';
+import { api, refreshGate } from '@/lib/store';
 // Buat/perbarui database, download backup, dan restore.
 export default function DatabaseCard(){
   const [busy,setBusy]=useState(false),[msg,setMsg]=useState<{t:string;ok:boolean}|null>(null);
@@ -10,8 +10,8 @@ export default function DatabaseCard(){
     const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download=`corestay-people-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();return 'Backup diunduh. Simpan file ini di tempat aman (berisi data gaji).'});
   const restore=(f?:File)=>{if(!f)return;run(async()=>{
     let j:any;try{j=JSON.parse(await f.text())}catch{throw new Error('File backup tidak valid')}
-    if(!confirm('Pulihkan backup? SELURUH data saat ini (karyawan, gaji, absensi) akan diganti dengan isi file ini. Lanjutkan?'))return 'Dibatalkan.';
-    const r=await api('/api/backup',{method:'POST',body:JSON.stringify(j)});await loadAll();return `Backup dipulihkan: ${r.emps} karyawan, ${r.att} data absensi.`})};
+    if(!confirm('Pulihkan backup? SELURUH data SEMUA HOTEL (karyawan, gaji, absensi) akan diganti dengan isi file ini. Lanjutkan?'))return 'Dibatalkan.';
+    const r=await api('/api/backup',{method:'POST',body:JSON.stringify(j)});await refreshGate();return `Backup dipulihkan: ${r.hotels} hotel, ${r.emps} karyawan, ${r.att} data absensi.${r.note||''}`})};
   return <section className="card panel"><h2>Database & Backup</h2>
     <p className="muted">Database dari Vercel → Storage (sudah terhubung). Tombol Buat database aman dijalankan berulang: hanya membuat tabel yang belum ada.</p>
     <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}>

@@ -2,30 +2,31 @@
 import Shell from '@/components/Shell';
 import Form from '@/components/Form';
 import { useState } from 'react';
-import HotelSetup from '@/components/HotelSetup';
+import Link from 'next/link';
 import DatabaseCard from '@/components/DatabaseCard';
 import { TZS } from '@/lib/geo';
-import { useDB, uid, assignCode, api, loadAll } from '@/lib/store';
+import { useDB, uid, assignCode, api, attDelEmp } from '@/lib/store';
 import { EMPTY, Settings, rp, deptPrefix, nextCode, pad } from '@/lib/payroll';
 const BASE_SHIFTS=['Pagi','Siang','Malam'];
 const ROLES:[string,string][]=[['Admin','Akses penuh, termasuk pengaturan dan buka kunci payroll'],['HRD','Karyawan, kompensasi, dan rekap absensi'],['Payroll','Proses payroll, koreksi, approval, dan lock'],['Manager','Melihat laporan dan labor cost'],['Viewer','Hanya melihat']];
 function Inp({label,v,onSave,type='text'}:{label:string;v:string|number;onSave:(s:string)=>void;type?:string}){
   return <div className="field"><label>{label}</label><input type={type} step={type==='number'?'any':undefined} defaultValue={v} key={String(v)} onBlur={e=>{if(e.target.value!==String(v))onSave(e.target.value)}}/></div>}
 export default function SettingsPage(){
-  const {db,update}=useDB();const S=db.settings;
+  const {db,update,me}=useDB();const S=db.settings;
   const sv=(k:keyof Settings,label:string)=>(val:string)=>update(d=>({...d,settings:{...d.settings,[k]:typeof d.settings[k]==='number'?Math.max(0,Number(val)||0):val}}),`Pengaturan ${label} → ${val}`);
   const grid={display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'0 12px'} as const;
   const [pw,setPw]=useState({old:'',n:''}),[pwMsg,setPwMsg]=useState('');
   const chPw=async()=>{try{await api('/api/auth',{method:'POST',body:JSON.stringify({action:'password',old:pw.old,password:pw.n})});setPw({old:'',n:''});setPwMsg('Password diganti.')}catch(e:any){setPwMsg(e.message)}};
-  const wipe=async()=>{if(prompt('Ini menghapus SEMUA data (karyawan, gaji, absensi, PIN). Download backup dulu. Ketik HAPUS untuk melanjutkan.')!=='HAPUS')return;
-    try{await api('/api/backup',{method:'POST',body:JSON.stringify({app:'corestay-people',v:2,state:{...EMPTY,period:new Date().toISOString().slice(0,7)},att:[],pins:[]})});await loadAll()}catch(e:any){alert(e.message)}};
-  const seed=()=>{update(d0=>{let d={...d0};const h='Hotel Contoh';d.hotels=d.hotels.includes(h)?d.hotels:[...d.hotels,h];
+  // Reset data HOTEL INI saja (hotel lain tidak tersentuh): karyawan, absensi, PIN, jadwal, payroll dikosongkan; hotel, lokasi, dan QR tetap.
+  const wipe=async()=>{if(prompt('Ini menghapus SEMUA data hotel ini (karyawan, gaji, absensi, PIN, jadwal). Hotel lain tidak terpengaruh. Download backup dulu. Ketik HAPUS untuk melanjutkan.')!=='HAPUS')return;
+    try{for(const e of db.emps)await attDelEmp(e.id);update(d=>({...EMPTY,hotels:d.hotels,geo:d.geo,settings:{...EMPTY.settings,company:d.settings.company,companyId:d.settings.companyId,radius:d.settings.radius,shift:d.settings.shift,tz:d.settings.tz},period:new Date().toISOString().slice(0,7)}),'Reset data hotel')}catch(e:any){alert(e.message)}};
+  const seed=()=>{update(d0=>{let d={...d0};const h=d.hotels[0];if(!h){alert('Belum ada hotel. Admin pusat mendaftarkannya di Semua Hotel.');return d0}
     for(const [n,dp,b,a] of [['Contoh A','Front Office',6000000,1000000],['Contoh B','Housekeeping',5000000,500000],['Contoh C','F&B',5500000,750000]] as [string,string,number,number][]){const[code,d2]=assignCode(d,dp);d={...d2,emps:[...d2.emps,{id:uid(),code,name:`${n} (contoh)`,hotel:h,dept:dp,position:'Staff',joinDate:'2025-01-01',status:'Aktif' as const,basic:b,allowance:a,deduction:0,thrFactor:0}]}}return d},'Isi data contoh')};
   const renumber=()=>{if(!confirm('Nomori ulang SEMUA ID karyawan sesuai kode departemen (FO-0001, HK-0001, ...)? Karyawan harus memakai ID baru saat absen (PIN tetap). Tidak bisa dibatalkan selain dengan Restore backup.'))return;
     update(d=>{const n:Record<string,number>={};return {...d,emps:d.emps.map(e=>{const pre=deptPrefix(d,e.dept);n[pre]=(n[pre]||0)+1;return {...e,code:`${pre}-${pad(d,n[pre])}`}})}},'Nomori ulang ID karyawan sesuai departemen')};
   const setUser=(id:string,patch:object,m:string)=>update(d=>({...d,settings:{...d.settings,users:d.settings.users.map(u=>u.id===id?{...u,...patch}:u)}}),`Pengguna ${id}: ${m}`);
-  return <Shell title="Pengaturan & Hak Akses" sub="Database & backup, hotel & QR absen, identitas perusahaan, penomoran ID, pengguna & peran, dan parameter absensi.">
-    <DatabaseCard/><HotelSetup/>
+  return <Shell title="Pengaturan & Hak Akses" sub="Identitas perusahaan, penomoran ID, pengguna & peran, parameter absensi dan payroll. Database & hotel dikelola admin pusat.">
+    {me?.role==='admin'?<><DatabaseCard/><section className="card panel" style={{marginTop:12}}><h2>Hotel & login</h2><p className="muted">Satu database untuk semua hotel; data tiap hotel terpisah dan tiap hotel punya login sendiri. Daftarkan hotel baru dan atur login di <Link href="/hotels">Semua Hotel & Login</Link>. Hotel yang sedang aktif dipilih di bagian atas halaman.</p></section></>:<section className="card panel"><h2>Hotel {db.hotels[0]||''}</h2><p className="muted">Anda masuk dengan login hotel (<b>{me?.username}</b>) dan hanya melihat data hotel ini. Hotel baru dan login didaftarkan oleh admin pusat.</p></section>}
     <section className="card panel" style={{marginTop:12}}><h2>Profil & ID Perusahaan</h2><div style={grid}>
       <Inp label="Nama perusahaan" v={S.company} onSave={sv('company','nama perusahaan')}/><Inp label="ID / kode perusahaan (tenant)" v={S.companyId} onSave={sv('companyId','ID perusahaan')}/>
       <Inp label="NPWP perusahaan" v={S.npwp} onSave={sv('npwp','NPWP')}/><Inp label="Telepon" v={S.phone} onSave={sv('phone','telepon')}/><Inp label="Email" type="email" v={S.email} onSave={sv('email','email')}/><Inp label="Alamat" v={S.address} onSave={sv('address','alamat')}/></div>
@@ -77,5 +78,5 @@ export default function SettingsPage(){
         {!db.settings.comps.length&&<tr><td className="muted" colSpan={5}>Belum ada komponen tambahan. Contoh: Tunjangan makan, Tunjangan transport, Potongan koperasi.</td></tr>}</tbody></table></div>
       <p className="muted">Nominal default berlaku untuk semua karyawan aktif; ubah per karyawan di menu Payroll (bagian Gaji karyawan). Komponen ikut masuk perhitungan Payroll dan slip. Gaji pokok, medical, makan, PTKP, asuransi, dan biaya lain diisi di menu Payroll.</p></section>
     <section className="card panel" style={{marginTop:12}}><h2>Ganti Password HRD</h2><div style={grid}><div className="field"><label>Password lama</label><input type="password" value={pw.old} onChange={e=>setPw({...pw,old:e.target.value})}/></div><div className="field"><label>Password baru (min. 6)</label><input type="password" value={pw.n} onChange={e=>setPw({...pw,n:e.target.value})}/></div></div><button className="button" disabled={!pw.old||pw.n.length<6} onClick={chPw}>Ganti password</button>{pwMsg&&<p role="status" className="muted">{pwMsg}</p>}</section>
-    <section className="card panel" style={{marginTop:12}}><h2>Data contoh & reset</h2><div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}><button className="button secondary" onClick={seed}>Isi data contoh</button><button className="button secondary" onClick={wipe}>Reset semua data</button></div>
-      <p className="muted">Data contoh hanya untuk uji coba. Reset menghapus semua data di database (minta ketik HAPUS).</p></section></Shell>}
+    <section className="card panel" style={{marginTop:12}}><h2>Data contoh & reset</h2><div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}><button className="button secondary" onClick={seed}>Isi data contoh</button><button className="button secondary" onClick={wipe}>Reset data hotel ini</button></div>
+      <p className="muted">Data contoh hanya untuk uji coba. Reset hanya menghapus data hotel yang sedang aktif (minta ketik HAPUS).</p></section></Shell>}

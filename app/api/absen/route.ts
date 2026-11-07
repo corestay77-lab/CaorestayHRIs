@@ -6,10 +6,10 @@ import { validShifts, shiftForRow, shiftLabel, planClockIn, Resolved } from '@/l
 export const dynamic='force-dynamic';
 type Doc={emps:any[];geo:Record<string,any>;sched:any[];shifts:any[];settings:any;periods:Record<string,string>};
 const fail=(error:string,status=200)=>json({ok:false,error},status);
-async function doc():Promise<Doc>{
-  const r=await q(`select data->'emps' as emps, data->'geo' as geo, data->'sched' as sched, data->'shifts' as shifts, data->'settings' as settings, data->'periods' as periods from hr_state where id=1`);
-  const d=r[0]||{};return {emps:d.emps||[],geo:d.geo||{},sched:d.sched||[],shifts:validShifts(d.shifts),settings:d.settings||{},periods:d.periods||{}}}
-const hotelByQr=(d:Doc,t:string)=>t?Object.keys(d.geo).find(h=>d.geo[h]?.qr&&d.geo[h].qr===t):undefined;
+// Hotel dari kode QR (setiap hotel punya QR sendiri) beserta dokumen datanya. Karyawan hanya dicari di hotel pemilik QR.
+async function hotelOf(t:string):Promise<{id:string;name:string;d:Doc}|null>{
+  if(!t)return null;const r=(await q(`select id, name, data from hr_hotel where qr=$1`,[t]))[0];if(!r)return null;const x=r.data||{};
+  return {id:r.id,name:r.name,d:{emps:x.emps||[],geo:x.geo||{},sched:x.sched||[],shifts:validShifts(x.shifts),settings:x.settings||{},periods:x.periods||{}}}}
 // Kolom shift untuk catatan absensi (dibuat otomatis sekali bila database lama belum punya).
 let cols=false;async function ensureCols(){if(cols)return;await q(`alter table hr_att add column if not exists shift text`);await q(`alter table hr_att add column if not exists shift_start text`);cols=true}
 // Gerbang absen masuk: jadwal bulanan sebagai patokan (kecuali mode 'off'), plus keterangan manual HRD (sakit/izin/cuti/alpa) hari itu.
@@ -23,8 +23,8 @@ async function gate(d:Doc,empId:string,geo:any,n:{date:string;time:string}):Prom
 const fb=(d:Doc,geo:any)=>String(geo?.shift||d.settings.shift||'08:00');
 export async function GET(req:Request){ // ?q=kode-QR → nama hotel (untuk ditampilkan setelah scan)
   if(!dbConfigured())return fail('Database belum dihubungkan.');
-  try{const t=new URL(req.url).searchParams.get('q')||'';const d=await doc(),h=hotelByQr(d,t);
-    return h?json({ok:true,hotel:h}):fail('QR tidak dikenali atau sudah diganti. Scan QR terbaru di pos security.')}catch(e:any){return fail(errMsg(e),500)}}
+  try{const t=new URL(req.url).searchParams.get('q')||'';const h=await hotelOf(t);
+    return h?json({ok:true,hotel:h.name}):fail('QR tidak dikenali atau sudah diganti. Scan QR terbaru di pos security.')}catch(e:any){return fail(errMsg(e),500)}}
 // Cek ID + PIN. Salah 5 kali → terkunci 15 menit.
 async function checkPin(d:Doc,code:string,pin:string){
   const e=d.emps.find((x:any)=>String(x.code||'').toUpperCase()===code.trim().toUpperCase()&&x.status==='Aktif');
@@ -46,8 +46,9 @@ async function position(empId:string,tz:string){
 const selfieOk=(s:any)=>{if(typeof s!=='string'||!s.startsWith('data:image/jpeg;base64,')||s.length<2000||s.length>400000)return false;try{const b=Buffer.from(s.slice(23,60),'base64');return b[0]===0xff&&b[1]===0xd8}catch{return false}};
 export async function POST(req:Request){
   if(!dbConfigured())return fail('Database belum dihubungkan.');
-  try{const b=await req.json(),d=await doc(),hotel=hotelByQr(d,String(b.q||''));
-    if(!hotel)return fail('QR tidak dikenali atau sudah diganti. Scan QR terbaru di pos security.');
+  try{const b=await req.json(),H=await hotelOf(String(b.q||''));
+    if(!H)return fail('QR tidak dikenali atau sudah diganti. Scan QR terbaru di pos security.');
+    const d=H.d,hotel=H.name;
     const c=await checkPin(d,String(b.code||''),String(b.pin||''));if(!c.e)return fail(c.err!);
     const e=c.e,geo=d.geo[hotel],maxAcc=Number(d.settings.maxAcc)||100;
     if(e.hotel!==hotel)return fail(`Anda terdaftar di ${e.hotel}. Scan QR hotel Anda sendiri.`);
@@ -72,7 +73,7 @@ export async function POST(req:Request){
     if(d.periods[p.n.date.slice(0,7)]==='locked')return fail('Payroll periode ini sudah dikunci. Hubungi HRD.');
     if(p.kind==='in'){
       const g=await gate(d,e.id,geo,p.n);if(!g.ok)return fail(g.reason);const sh=g.r!,late=Math.max(0,absMin(p.n.date,p.n.time)-absMin(sh.workDate,sh.start)-(Number(d.settings.tol)||0));
-      const ins=await q(`insert into hr_att(id,emp_id,work_date,status,clock_in,late_min,dist,acc,src,note,shift,shift_start) values($1,$2,$3,'Hadir',$4,$5,$6,$7,'qr',$8,$9,$10) on conflict do nothing returning id`,[crypto.randomUUID(),e.id,sh.workDate,p.n.time,late,dist,accR,warn?'⚠ '+warn:null,shiftLabel(sh)||null,sh.start]);
+      const ins=await q(`insert into hr_att(id,emp_id,work_date,status,clock_in,late_min,dist,acc,src,note,shift,shift_start,hotel_id) values($1,$2,$3,'Hadir',$4,$5,$6,$7,'qr',$8,$9,$10,$11) on conflict do nothing returning id`,[crypto.randomUUID(),e.id,sh.workDate,p.n.time,late,dist,accR,warn?'⚠ '+warn:null,shiftLabel(sh)||null,sh.start,H.id]);
       if(!ins.length)return fail('Absensi untuk hari/shift ini sudah tercatat.');
       return json({ok:true,kind:'in',tzLabel:tzl,time:p.n.time,lateMin:late,shift:`${shiftLabel(sh)} ${sh.start}`.trim(),warn})}
     // pulang: jam kerja & usulan lembur (kelipatan 30 menit setelah jam selesai shift, maks 4 jam) langsung masuk rekap

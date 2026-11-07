@@ -10,12 +10,11 @@ export default function Org(){
   const {db,update}=useDB();
   const addDept=(v:Record<string,string>)=>{const n=v.n.trim();if(db.depts.includes(n))return;update(d=>({...d,depts:[...d.depts,n]}),`Tambah Departemen: ${n}`)};
   // Hotel baru langsung dibuatkan kode QR absennya; lokasi diatur di tabel bawah (atau di Pengaturan → Daftar Hotel Awal).
-  const addHotel=(v:Record<string,string>)=>{const n=v.n.trim();if(db.hotels.includes(n))return;update(d=>({...d,hotels:[...d.hotels,n],geo:{...d.geo,[n]:{lat:0,lng:0,radius:d.settings.radius,shift:d.settings.shift,qr:newToken()}}}),`Tambah Hotel: ${n}`)};
   const List=({title,items,key2,onAdd}:{title:string;items:string[];key2:'hotels'|'depts';onAdd:(v:Record<string,string>)=>void})=><section className="card panel"><h2>{title}</h2>
     <Form fields={[{k:'n',label:'Nama',req:true}]} onAdd={onAdd}/>
     <div className="table-wrap"><table><tbody>{items.map(i=>{const used=db.emps.some(e=>(key2==='hotels'?e.hotel:e.dept)===i);return <tr key={i}><td>{i}</td><td>{used?<span className="badge">dipakai karyawan</span>:<button className="button secondary" onClick={()=>update(d=>{const n={...d,[key2]:d[key2].filter(x=>x!==i)};if(key2==='hotels'){const g={...d.geo};delete g[i];n.geo=g}return n},`Hapus ${title}: ${i}`)}>Hapus</button>}</td></tr>})}
     {!items.length&&<tr><td className="muted">Belum ada data.</td></tr>}</tbody></table></div></section>;
-  return <Shell title="Organisasi & Hotel" sub="Hotel dan departemen dipakai oleh Employee Master, Absensi, Payroll, dan Labor Cost."><div className="grid"><List title="Hotel" items={db.hotels} key2="hotels" onAdd={addHotel}/><List title="Departemen" items={db.depts} key2="depts" onAdd={addDept}/></div><GeoSection/></Shell>}
+  return <Shell title="Organisasi & Hotel" sub="Departemen, lokasi, QR absen, dan zona waktu hotel ini. Hotel baru didaftarkan admin pusat di Semua Hotel & Login."><div className="grid"><List title="Departemen" items={db.depts} key2="depts" onAdd={addDept}/></div><GeoSection/></Shell>}
 
 function GeoSection(){
   const {db,update}=useDB();const [qrHotel,setQrHotel]=useState('');

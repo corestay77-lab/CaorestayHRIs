@@ -1,33 +1,35 @@
-# CoreStay People — HR, Absensi & Payroll
+# CoreStay People — HR, Absensi & Payroll (multi-hotel)
 
-Satu aplikasi Next.js + satu database Postgres dari **Vercel → Storage** (Neon). Tanpa akun lain, tanpa menyalin kunci.
+Satu aplikasi Next.js + **satu database** Postgres dari **Vercel → Storage** (Neon). Tanpa akun lain, tanpa menyalin kunci.
+Banyak hotel dalam satu database, tetapi **data tiap hotel terpisah** dan tiap hotel punya **login sendiri**; ada satu **admin pusat** yang melihat semua hotel.
 
 ## Pasang (sekali saja)
-1. Unggah proyek ke GitHub, impor di Vercel, Deploy.
-2. Vercel → proyek → **Storage → Create Database** (Postgres) → **Connect** ke proyek ini. Variabel `DATABASE_URL` terisi otomatis.
-3. **Deployments → Redeploy**.
-4. Buka alamat aplikasi → **Setup awal**: buat password HRD → klik **Buat database & masuk**.
-5. **Pengaturan → Daftar Hotel Awal**: isi nama + lokasi hotel → **Daftarkan hotel & buat QR** → **Cetak poster** → tempel di pos security.
-6. **Employee Master**: tambah karyawan, atur **PIN absen** (4–8 digit) di tabel karyawan.
+1. Unggah proyek ke GitHub, impor di Vercel, Deploy. Jalankan `npm install` bila memasang manual.
+2. Vercel → proyek → **Storage → Create Database** (Postgres) → **Connect** ke proyek ini → **Deployments → Redeploy**.
+3. Buka alamat aplikasi → **Setup awal**: buat password admin pusat (username `admin`) → **Buat database & masuk**.
+4. **Semua Hotel & Login** → daftarkan hotel (nama, lokasi, zona waktu) beserta username & password login hotel itu.
+5. Pilih hotel di bagian atas → **Organisasi & Hotel**: cetak **QR absen** dan tempel di pos security hotel tersebut.
+6. **Payroll → Nama karyawan baru** (atau Employee Master): tambah karyawan; atur **PIN absen** di Employee Master; isi jadwal di **Absensi → Daftar Bulanan**.
 
-Lupa password? Neon Console (Storage → Open in Neon) → SQL: `delete from hr_auth;` lalu buka aplikasi, buat password baru.
-Pengembangan lokal: `vercel link && vercel env pull .env.local && npm install && npm run dev`.
+**Upgrade dari versi satu-dokumen:** buka aplikasi → klik **Perbarui database**. Data lama dipertahankan dan dipecah per hotel; password lama menjadi login admin (username `admin`).
+Lupa password admin? Neon Console → SQL: `delete from hr_user; delete from hr_auth;` lalu buka aplikasi dan jalankan **Setup awal** lagi (data hotel tidak terhapus). Login tiap hotel perlu dibuat ulang lewat **Semua Hotel → Reset login** (isi username & password). Lupa password hotel: admin pusat → Semua Hotel → Reset login.
+
+## Multi-hotel
+- **Login hotel** hanya melihat dan mengubah hotelnya sendiri (server menolak akses ke hotel lain). **Admin pusat** memilih hotel aktif di bagian atas, melihat ringkasan semua hotel, mendaftarkan hotel baru, mereset login, serta backup/restore.
+- Setiap hotel punya: karyawan, jadwal, absensi, PIN, payroll & penguncian periode, Master Payroll, pengaturan, dan **QR absen sendiri**. ID karyawan (mis. FO-0001) hanya unik di dalam hotel.
 
 ## Alur absensi
-Karyawan scan QR di pos security → `/absen` → ID + PIN → **Absen Masuk / Pulang** (satu tombol).
-- Server menolak bila: QR salah/diganti, QR hotel lain, PIN salah (terkunci 15 menit setelah 5×), akurasi GPS > batas (default 100 m), di luar radius hotel, atau tidak ada selfie dari kamera.
-- **Selfie & lokasi hanya untuk validasi. Foto tidak disimpan** (hanya jam, jarak, dan akurasi GPS yang tercatat).
-- Hasil langsung masuk **Absensi → Rekap** (hadir, telat, sakit/izin/cuti, alpa, lembur). Tidak ada validasi/persetujuan/closing absensi.
-- **Payroll** membaca lembur dari rekap. **Potongan absensi (alpa/telat) diisi manual** oleh HRD di Payroll; Rekap hanya memberi saran angka.
-- Sakit/izin/cuti/koreksi: input manual di Absensi → Harian. **Jadwal bulanan (Absensi → Daftar Bulanan) jadi patokan absen**: karyawan hanya bisa absen masuk sesuai shift yang dijadwalkan (jadwal tampil langsung setelah login; Libur / belum dijadwalkan / di luar jam shift ditolak). Bisa dimatikan di Pengaturan. Alpa tidak otomatis: HRD menandainya sendiri.
+Karyawan scan QR hotel → `/absen` → ID + PIN → jadwal hari itu tampil → **Absen Masuk / Pulang** (satu tombol).
+- **Jadwal bulanan jadi patokan:** masuk hanya sesuai shift yang dijadwalkan (Libur / belum dijadwalkan / di luar jam shift ditolak). Bisa dimatikan di Pengaturan.
+- Server menolak bila QR salah/diganti, PIN salah (terkunci 15 menit setelah 5×), akurasi GPS buruk, di luar radius hotel (mode Ketat), atau tanpa selfie. **Foto tidak disimpan.**
+- Jam mengikuti zona waktu hotel. Hasil langsung masuk **Absensi → Rekap**. Alpa tidak otomatis; HRD menandainya sendiri.
+- **Payroll** membaca lembur dari rekap; **potongan absensi diisi manual** (rekap memberi saran).
 
 ## Master Payroll & sinkron dengan Hotel Budget
-**Payroll → Data karyawan dan perhitungan biaya** = Master Payroll yang sama dengan menu Master Payroll di Hotel Budget (posisi × jumlah staf).
-Untuk menyinkronkan: di Hotel Budget unduh **Draft (.json)** atau **Excel (.xlsx)**, lalu buka **Pengaturan → Integrasi · CoreStay Sync → Sinkronisasi Master Payroll**, pilih file, cek pratinjau, **Terapkan**. Impor ulang memperbarui baris yang sama, tidak menggandakan.
-Master Payroll adalah model biaya per posisi; gaji tiap karyawan diisi di **Payroll → Gaji karyawan**. Setelah mengganti `package.json`, jalankan `npm install` (ada paket baru `xlsx`).
+Payroll → tabel karyawan (otomatis dari Employee Master) dan tabel **anggaran posisi** yang disinkronkan dari file Hotel Budget (**Pengaturan → Integrasi · CoreStay Sync**: Draft .json atau Excel .xlsx).
 
 ## Backup
-**Pengaturan → Database & Backup**: Buat/perbarui database, **Download backup**, **Restore backup** (mengganti seluruh data; menerima juga file backup lama dari versi yang menyimpan data di browser).
+Admin pusat: **Pengaturan → Database & Backup**: Buat/perbarui database, **Download backup** (semua hotel), **Restore backup** (mengganti seluruh isi database; menerima backup versi lama).
 
 ## Keamanan
-Seluruh data HRD dilindungi password HRD (cookie sesi 12 jam). Satu-satunya endpoint tanpa login adalah `/api/absen` (khusus absen karyawan, perlu QR + ID + PIN). Payroll belum menghitung PPh 21; tarif BPJS default — verifikasi sebelum dipakai nyata.
+Semua data dilindungi login (cookie sesi 12 jam). Satu-satunya endpoint tanpa login adalah `/api/absen` (khusus absen karyawan: QR + ID + PIN). PPh 21 mengikuti perhitungan Master Payroll; tarif Jamsostek dapat diatur di Pengaturan.

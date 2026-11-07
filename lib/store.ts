@@ -4,23 +4,33 @@ import { DB, Att, EMPTY, normalize, nextCode } from './payroll';
 import { monthAdd } from './geo';
 // Sumber data = database Vercel (Neon) lewat /api. Data HRD (karyawan, gaji, hotel, jadwal, dll.) satu dokumen;
 // absensi ada di tabel sendiri dan ikut dimuat ke db.att supaya Rekap & Payroll membacanya dengan cara yang sama.
-export type Gate={state:'loading'|'none'|'empty'|'error'|'setup'|'login'|'ok';msg?:string};
+export type Gate={state:'loading'|'none'|'empty'|'upgrade'|'error'|'setup'|'login'|'ok';msg?:string};
+export type Me={id:string;username:string;role:'admin'|'hotel';hotelId:string|null};
+export type HotelRef={id:string;name:string;username?:string};
 let doc:DB=EMPTY,att:Att[]=[],version=0,gate:Gate={state:'loading'},attFrom='',saveErr='',view:DB=EMPTY;
+// multi-hotel: setiap hotel punya data sendiri. Login hotel terkunci ke hotelnya; admin pusat memilih hotel aktif.
+let me:Me|null=null,hotels:HotelRef[]=[],hotelId='';
 const subs=new Set<()=>void>();
 const rebuild=()=>{view={...doc,att}};
 const emit=()=>{rebuild();subs.forEach(s=>s())};
 export async function api(path:string,init:RequestInit={}){
-  const r=await fetch(path,{...init,headers:{'Content-Type':'application/json',...(init.headers||{})},cache:'no-store'});
+  const r=await fetch(path,{...init,headers:{'Content-Type':'application/json',...(hotelId?{'X-Hotel':hotelId}:{}),...(init.headers||{})},cache:'no-store'});
   const j=await r.json().catch(()=>({}));
   if(!r.ok){const e:any=new Error(j.error||`HTTP ${r.status}`);e.status=r.status;throw e}return j}
 export const read=():DB=>view;
 let booted=false;
 export async function refreshGate(){
   try{const s=await api('/api/auth');
-    if(s.db==='none')gate={state:'none'};else if(s.db==='empty')gate={state:'empty'};else if(s.db==='error')gate={state:'error',msg:s.error};
-    else if(s.auth==='setup')gate={state:'setup'};else if(s.auth==='login')gate={state:'login'};else{gate={state:'ok'};await loadAll();return}
+    if(s.db==='none')gate={state:'none'};else if(s.db==='empty')gate={state:'empty'};else if(s.db==='upgrade')gate={state:'upgrade'};else if(s.db==='error')gate={state:'error',msg:s.error};
+    else if(s.auth==='setup')gate={state:'setup'};else if(s.auth==='login')gate={state:'login'};
+    else{me=s.me;gate={state:'ok'};await loadHotels();
+      hotelId=me!.role==='hotel'?(me!.hotelId||''):(()=>{try{const h=localStorage.getItem('cs-hotel');return hotels.some(x=>x.id===h)?h!:hotels[0]?.id||''}catch{return hotels[0]?.id||''}})();
+      if(hotelId){await loadAll();return}doc=EMPTY;att=[];attFrom=''}
   }catch(e:any){gate={state:'error',msg:e.message}}
   emit()}
+async function loadHotels(){try{hotels=(await api('/api/hotels')).hotels}catch{hotels=[]}}
+export async function reloadHotels(){await loadHotels();if(me?.role==='admin'&&hotelId&&!hotels.some(h=>h.id===hotelId))hotelId=hotels[0]?.id||'';emit()}
+export async function switchHotel(id:string){hotelId=id;try{localStorage.setItem('cs-hotel',id)}catch{}doc=EMPTY;att=[];attFrom='';emit();if(id)await loadAll();else emit()}
 export async function loadAll(){
   const s=await api('/api/state');doc=normalize(s.data);version=s.version;
   if(!s.data?.period)doc={...doc,period:new Date().toISOString().slice(0,7)};
@@ -31,6 +41,7 @@ export async function loadAtt(force=false){
   try{const r=await api('/api/att?from='+from);att=r.att;attFrom=from}catch(e:any){if(e.status===401){gate={state:'login'}}}emit()}
 let timer:any=null,saving=false,dirty=false;
 async function flush(){
+  if(!hotelId)return;
   if(saving){dirty=true;return}saving=true;dirty=false;
   try{const d:any={...doc};delete d.att;
     const cut=new Date(Date.now()-200*864e5).toISOString().slice(0,10);d.sched=d.sched.filter((s:any)=>s.date>=cut); // jadwal lama dipangkas agar data tetap ringan
@@ -57,7 +68,7 @@ const sub=(f:()=>void)=>{subs.add(f);if(!booted){booted=true;refreshGate()}retur
 export function useDB(){
   const db=useSyncExternalStore(sub,()=>view,()=>EMPTY);
   const locked=db.periods[db.period]==='locked';
-  return {db,update,locked,status:db.periods[db.period]||'draft',gate,saveErr};
+  return {db,update,locked,status:db.periods[db.period]||'draft',gate,saveErr,me,hotels,hotelId,switchHotel};
 }
 export const uid=()=>crypto.randomUUID();
 export const newToken=()=>Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b=>b.toString(16).padStart(2,'0')).join('');
