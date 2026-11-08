@@ -1,5 +1,5 @@
 import { nowIn, okTz, DEFAULT_TZ } from './geo';
-export type Emp={id:string;code?:string;name:string;hotel:string;dept:string;position:string;joinDate:string;status:'Aktif'|'Nonaktif';basic:number;allowance:number;deduction:number;thrFactor:number;comps?:Record<string,number>;medical?:number;meal?:number;ptkp?:number;insurance?:number;otherCost?:number};
+export type Emp={id:string;code?:string;name:string;hotel:string;dept:string;position:string;joinDate:string;status:'Aktif'|'Nonaktif';basic:number;allowance:number;deduction:number;thrFactor:number;comps?:Record<string,number>;medical?:number;meal?:number;ptkp?:number;ptkpCode?:string;insurance?:number;otherCost?:number};
 // Satu baris absensi. Karyawan yang scan QR tercatat otomatis (src 'qr'); sakit/izin/cuti/koreksi diinput HRD (src 'manual').
 export type Att={id:string;empId:string;date:string;status:'Hadir'|'Sakit'|'Izin'|'Alpa'|'Cuti';otHours:number;src?:'manual'|'qr'|'selfie';in?:string;out?:string;dist?:number;late?:boolean;lateMin?:number;hours?:number;note?:string;shift?:string;shiftStart?:string};
 export type Shift={name:string;start:string;end:string};

@@ -2,6 +2,12 @@
 
 Aturan: setiap update menaikkan versi di `lib/version.ts` dan `package.json`, lalu dicatat di sini.
 
+## 0.9.1
+- **Payroll disederhanakan.** Halaman utama kini satu tabel **Pembayaran**: Karyawan, Gaji pokok, Medical, Makan, Status PTKP (pilih TK/0 … K/3), Lembur, Potongan absensi, Lainnya, Jamsostek staf, PPh 21, Gaji bersih, Slip. Semua isian langsung terhitung; ada tambah karyawan cepat, tombol Isi saran potongan, Preview Laporan Salary, dan Ajukan Approval di satu tempat.
+- Tabel 20 kolom (THR provisi, Jamsostek perusahaan, PKP, PPh tahunan, asuransi, biaya lain, total biaya perusahaan) dipindah ke bagian lipat **Rincian biaya perusahaan & PPh**; anggaran posisi Hotel Budget ke bagian lipat **Anggaran posisi**. Bagian "Rekap absensi → Payroll" digabung ke tabel utama (alpa/telat dan saran tampil di bawah kolom potongan).
+- PTKP dipilih dari daftar status, bukan mengetik angka.
+- Diperiksa: perhitungan contoh Sofyan (gaji 50.000.000) sama dengan rumus: THR 4.166.667, PPh/tahun 121.612.000, gaji bersih 39.035.667.
+
 ## 0.9.0
 - **Multi-hotel, satu database, data terpisah per hotel.** Tiap hotel punya dokumen data sendiri (karyawan, jadwal, payroll, Master Payroll, pengaturan, QR absen) di tabel `hr_hotel`; absensi dan PIN ditandai `hotel_id`. Login hotel hanya melihat hotelnya; server menolak akses ke hotel lain.
 - **Akun:** username + password. **Admin pusat** melihat semua hotel (pemilih hotel di bagian atas), mendaftarkan hotel baru + login-nya, reset login, dan backup/restore. Halaman baru **Semua Hotel & Login** berisi ringkasan semua hotel.
