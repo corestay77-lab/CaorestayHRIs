@@ -1,8 +1,11 @@
 'use client';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Users,CalendarCheck,TriangleAlert,Wallet,ChartColumn,PieChart,ClipboardList,Clock,History,Calendar,ChevronLeft,ChevronRight } from 'lucide-react';
+import { Users,CalendarCheck,TriangleAlert,Wallet,ChartColumn,PieChart,ClipboardList,Clock,History,Calendar,ChevronLeft,ChevronRight,QrCode } from 'lucide-react';
 import Shell from '@/components/Shell';
-import { useDB } from '@/lib/store';
+import { useDB, newToken } from '@/lib/store';
+import QrSvg from '@/components/QrSvg';
+import HotelQr from '@/components/HotelQr';
 import { calc, rp } from '@/lib/payroll';
 import { nowIn } from '@/lib/geo';
 const COL=['#1d5bff','#3b9bff','#7b3fe4','#13b8aa','#d9b45a','#ff7a59','#8aa4d6'];
@@ -14,6 +17,11 @@ const Hero=()=><svg viewBox="0 0 600 180" preserveAspectRatio="xMaxYMax slice" a
   <path d="M0 150 Q150 125 300 150 T600 145 V180 H0Z" fill="#fff" fillOpacity=".12"/><path d="M0 165 Q150 148 300 165 T600 160 V180 H0Z" fill="#fff" fillOpacity=".18"/></svg>;
 export default function Home(){
   const {db,update,status}=useDB(),today=nowIn(db.settings.tz).date,P=db.period;
+  // QR absen hotel yang sedang aktif (login hotel = hotelnya sendiri; admin = hotel yang dipilih di atas)
+  const hotel=db.hotels[0]||'',tok=db.geo[hotel]?.qr||'',hasGeo=!!(db.geo[hotel]?.lat||db.geo[hotel]?.lng);
+  const [base,setBase]=useState(''),[poster,setPoster]=useState(false),[copied,setCopied]=useState(false);useEffect(()=>setBase(location.origin),[]);
+  const qrUrl=`${base}/absen?q=${tok}`,regen=()=>update(d=>({...d,geo:{...d.geo,[hotel]:{lat:0,lng:0,radius:d.settings.radius,shift:d.settings.shift,tz:d.settings.tz,...(d.geo[hotel] as object|undefined),qr:newToken()} as typeof d.geo[string]}}),`Kode QR ${hotel} dibuat/diganti`);
+  const copyUrl=async()=>{try{await navigator.clipboard.writeText(qrUrl);setCopied(true);setTimeout(()=>setCopied(false),1500)}catch{}};
   const act=db.emps.filter(e=>e.status==='Aktif');
   const todayAtt=db.att.filter(a=>a.date===today);
   const cnt=(f:(a:typeof todayAtt[0])=>boolean)=>todayAtt.filter(f).length;
@@ -56,8 +64,17 @@ export default function Home(){
       <article className="card panel s2"><h2><span className="ic"><ClipboardList size={16}/></span>Tugas yang Perlu Ditindaklanjuti</h2>{tasks.map(([t,s,n,h])=><Link key={t} href={h} className="row"><div className="grow"><b>{t}</b><span className="muted">{s}</span></div><span className={`cnt ${n>0?'hot':''}`}>{n}</span></Link>)}</article>
       <article className="card panel s2"><h2><span className="ic"><Wallet size={16}/></span>Status Payroll<Link href="/approval">Lihat Semua</Link></h2><div className="table-wrap"><table><thead><tr><th>Periode</th><th>Status</th><th>Karyawan</th></tr></thead><tbody>{per.map(p=>{const[l,c]=sb(db.periods[p]||'draft');return <tr key={p}><td>{p}</td><td><span className={`badge ${c}`}>{l}</span></td><td>{act.length}</td></tr>})}</tbody></table></div></article>
       <article className="card panel s2"><h2><span className="ic"><Clock size={16}/></span>Absensi Hari Ini<Link href="/attendance">Lihat Semua</Link></h2>{A.map(([l,n,c])=><div className="row" key={l}><i style={{width:9,height:9,borderRadius:'50%',background:c}}/><span style={{width:110}}>{l}</span><b style={{display:'inline',width:28}}>{n}</b><span className="bar"><i style={{width:(aTot?n/aTot*100:0)+'%',background:c}}/></span><span className="muted" style={{width:34,textAlign:'right'}}>{aTot?Math.round(n/aTot*100)+'%':'—'}</span></div>)}</article>
+      <article className="card panel s2"><h2><span className="ic"><QrCode size={16}/></span>QR Absen{hotel?` · ${hotel}`:''}</h2>
+        {!hotel?<p className="muted">Belum ada hotel aktif. Daftarkan di Semua Hotel & Login.</p>:tok?<div style={{textAlign:'center'}}>
+          {base&&qrUrl.length<=106?<QrSvg text={qrUrl} size={150}/>:<div className="muted" style={{padding:'20px 0'}}>{base?'Alamat terlalu panjang untuk QR':'Menyiapkan QR…'}</div>}
+          <div className="muted" style={{fontSize:11,wordBreak:'break-all',margin:'6px 0 8px'}}>{base&&qrUrl}</div>
+          {!hasGeo&&<p className="badge wait" style={{whiteSpace:'normal'}}>Lokasi hotel belum diatur: atur di <Link href="/organization">Organisasi & Hotel</Link> agar absen tervalidasi.</p>}
+          <div style={{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap'}}><button className="button" onClick={()=>setPoster(true)}>Poster & cetak</button><button className="button secondary" onClick={copyUrl}>{copied?'Tersalin ✓':'Salin tautan'}</button></div></div>
+        :<div><p className="muted">Hotel ini belum punya kode QR absen.</p><button className="button" onClick={regen}>Buat QR absen</button></div>}</article>
       <article className="card panel promo s2"><h2>Satu Platform Untuk Semua Kebutuhan HR & Payroll</h2><p>Dari data karyawan hingga laporan biaya tenaga kerja, semua dalam satu sistem.</p><Link className="button" href="/employees">Mulai dari Employee Master →</Link></article>
       <article className="card panel s2"><h2><span className="ic"><History size={16}/></span>Aktivitas Terbaru<Link href="/audit">Lihat Semua</Link></h2>{db.audit.slice(0,5).map((a,i)=><div className="row" key={i}><div className="grow"><b style={{fontWeight:600}}>{a.m}</b></div><span className="muted">{new Date(a.t).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</span></div>)}{!db.audit.length&&<p className="muted">Belum ada aktivitas.</p>}</article>
       <article className="card panel s2"><h2><span className="ic"><Calendar size={16}/></span>Kalender<span style={{marginLeft:'auto',display:'flex',gap:6,alignItems:'center'}}><button className="button secondary" style={{padding:'4px 8px'}} aria-label="Bulan sebelumnya" onClick={()=>update(d=>({...d,period:monthAdd(d.period,-1)}))}><ChevronLeft size={14}/></button><span style={{fontSize:12,fontWeight:600}}>{new Date(P+'-01T00:00:00Z').toLocaleDateString('id-ID',{month:'long',year:'numeric',timeZone:'UTC'})}</span><button className="button secondary" style={{padding:'4px 8px'}} aria-label="Bulan berikutnya" onClick={()=>update(d=>({...d,period:monthAdd(d.period,1)}))}><ChevronRight size={14}/></button></span></h2>
         <div className="cal">{['Sen','Sel','Rab','Kam','Jum','Sab','Min'].map(d=><span className="h" key={d}>{d}</span>)}{Array.from({length:first}).map((_,i)=><span key={'e'+i}/>)}{Array.from({length:dim},(_,i)=>i+1).map(d=><span key={d} className={`${P+'-'+String(d).padStart(2,'0')===today?'today':''} ${mark.has(d)?'dot':''}`}>{d}</span>)}</div><p className="muted" style={{marginTop:8}}>Titik hijau: ada jadwal atau absensi.</p></article>
-    </section></Shell>}
+    </section>
+    {poster&&tok&&<HotelQr hotel={hotel} token={tok} onRegen={regen} onClose={()=>setPoster(false)}/>}
+  </Shell>}

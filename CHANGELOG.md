@@ -2,6 +2,12 @@
 
 Aturan: setiap update menaikkan versi di `lib/version.ts` dan `package.json`, lalu dicatat di sini.
 
+## 0.9.3
+- **Dashboard menampilkan QR Absen hotel yang sedang aktif** (login hotel = hotelnya; admin = hotel yang dipilih di atas): kode QR, tautan, tombol **Poster & cetak** dan **Salin tautan**; peringatan bila lokasi hotel belum diatur; tombol **Buat QR absen** bila belum ada kode.
+
+## 0.9.2
+- **QR absen mudah dibuka dari Semua Hotel & Login:** tombol **QR absen** di tiap baris hotel membuka poster QR (cetak / salin tautan / ganti kode) tanpa perlu berpindah hotel. Setelah mendaftarkan hotel baru, poster QR langsung tampil.
+
 ## 0.9.1
 - **Payroll disederhanakan.** Halaman utama kini satu tabel **Pembayaran**: Karyawan, Gaji pokok, Medical, Makan, Status PTKP (pilih TK/0 … K/3), Lembur, Potongan absensi, Lainnya, Jamsostek staf, PPh 21, Gaji bersih, Slip. Semua isian langsung terhitung; ada tambah karyawan cepat, tombol Isi saran potongan, Preview Laporan Salary, dan Ajukan Approval di satu tempat.
 - Tabel 20 kolom (THR provisi, Jamsostek perusahaan, PKP, PPh tahunan, asuransi, biaya lain, total biaya perusahaan) dipindah ke bagian lipat **Rincian biaya perusahaan & PPh**; anggaran posisi Hotel Budget ke bagian lipat **Anggaran posisi**. Bagian "Rekap absensi → Payroll" digabung ke tabel utama (alpa/telat dan saran tampil di bawah kolom potongan).

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { q } from '@/lib/db';
 import { auth, json, errMsg, hashSecret } from '@/lib/auth';
 import { newHotelDoc } from '@/lib/tenant';
@@ -20,11 +20,13 @@ export async function POST(req:Request){
     await q(`insert into hr_hotel(id,name,data,version,qr) values($1,$2,$3::jsonb,1,$4)`,[id,name,JSON.stringify(doc),doc.geo[name].qr]);
     try{await q(`insert into hr_user(id,username,pass_hash,role,hotel_id) values($1,$2,$3,'hotel',$4)`,[randomUUID(),username,hashSecret(pw),id])}
     catch(e){await q(`delete from hr_hotel where id=$1`,[id]);throw e}
-    return json({id,name})}catch(e:any){return json({error:errMsg(e)},500)}}
+    return json({id,name,qr:doc.geo[name].qr})}catch(e:any){return json({error:errMsg(e)},500)}}
 // Ganti username / reset password login sebuah hotel (admin pusat).
 export async function PATCH(req:Request){
   const a=await auth(req,{admin:true});if('res' in a)return a.res;
   try{const b=await req.json(),id=String(b.id||'');if(!(await q(`select 1 from hr_hotel where id=$1`,[id])).length)return json({error:'Hotel tidak ditemukan'},404);
+    if(b.regenQr){const h=(await q(`select name from hr_hotel where id=$1`,[id]))[0],tok=randomBytes(12).toString('hex');
+      await q(`update hr_hotel set data=jsonb_set(data,ARRAY['geo',$2::text,'qr'],to_jsonb($3::text)), qr=$3::text, version=version+1 where id=$1`,[id,h.name,tok]);return json({ok:true,qr:tok})}
     const un=b.username?String(b.username).trim():'',pw=b.password?String(b.password):'';
     if(un&&!USER.test(un))return json({error:'Username tidak valid'},400);if(pw&&pw.length<6)return json({error:'Password minimal 6 karakter'},400);
     if(un&&(await q(`select 1 from hr_user where lower(username)=lower($1) and hotel_id is distinct from $2`,[un,id])).length)return json({error:'Username sudah dipakai'},409);
